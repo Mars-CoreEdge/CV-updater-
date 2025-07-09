@@ -22,7 +22,7 @@ from reportlab.lib import colors
 from fastapi.responses import Response
 
 # OpenAI setup
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY") 
 app = FastAPI(title="CV Updater Chatbot with OpenAI", version="2.0.0")
 
 app.add_middleware(
@@ -47,14 +47,17 @@ class CVResponse(BaseModel):
 
 # Database setup
 def init_db():
-    conn = sqlite3.connect('cv_updater.db')
+    conn = sqlite3.connect('cv_updater.db', timeout=30.0)
+    conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
     cursor = conn.cursor()
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS cvs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL DEFAULT 'Untitled CV',
         filename TEXT NOT NULL,
         original_content TEXT NOT NULL,
         current_content TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
@@ -91,10 +94,72 @@ def init_db():
     except Exception as e:
         print(f"Note: {e}")
     
+    # Add new columns if they don't exist
+    try:
+        cursor.execute("PRAGMA table_info(cvs)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'title' not in columns:
+            cursor.execute("ALTER TABLE cvs ADD COLUMN title TEXT NOT NULL DEFAULT 'Untitled CV'")
+            print("Added 'title' column to cvs table")
+        if 'is_active' not in columns:
+            cursor.execute("ALTER TABLE cvs ADD COLUMN is_active BOOLEAN DEFAULT FALSE")
+            print("Added 'is_active' column to cvs table")
+            
+            # Set the most recent CV as active if no CV is marked as active
+            cursor.execute("SELECT COUNT(*) FROM cvs WHERE is_active = TRUE")
+            active_count = cursor.fetchone()[0]
+            if active_count == 0:
+                cursor.execute("UPDATE cvs SET is_active = TRUE WHERE id = (SELECT id FROM cvs ORDER BY updated_at DESC LIMIT 1)")
+                print("Set most recent CV as active")
+    except Exception as e:
+        print(f"Note: {e}")
+    
     conn.commit()
     conn.close()
 
 init_db()
+
+import threading
+import time
+from contextlib import contextmanager
+
+# Global database lock
+db_lock = threading.RLock()
+
+def get_db_connection():
+    """Get database connection with proper timeout and error handling"""
+    try:
+        conn = sqlite3.connect('cv_updater.db', timeout=60.0, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
+        conn.execute("PRAGMA synchronous=NORMAL")  # Better performance
+        conn.execute("PRAGMA cache_size=10000")   # Larger cache
+        conn.execute("PRAGMA temp_store=memory")  # Use memory for temp tables
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        raise
+
+@contextmanager
+def get_db_cursor():
+    """Context manager for database operations with automatic cleanup"""
+    conn = None
+    cursor = None
+    try:
+        with db_lock:  # Use threading lock
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            yield cursor, conn
+            conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Database operation error: {e}")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def extract_text_from_file(file: UploadFile) -> str:
     content = file.file.read()
@@ -569,130 +634,187 @@ def clean_duplicate_project_sections(cv_content: str) -> str:
     
     return '\n'.join(cleaned_lines)
 
-def generate_cv_with_projects() -> str:
-    """Generate updated CV with all projects properly integrated"""
+def smart_section_integration(cv_content: str, section_type: str, new_content: List[str]) -> str:
+    """Intelligently integrate new content into appropriate sections"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
+        sections = parse_cv_sections(cv_content)
+        cv_lines = cv_content.split('\n')
         
-        # Get original CV
-        cursor.execute("SELECT current_content FROM cvs LIMIT 1")
-        cv_row = cursor.fetchone()
-        if not cv_row:
-            return "No CV found. Please upload a CV first."
-        
-        original_cv = cv_row[0]
-        
-        # Clean up any existing duplicate sections first
-        original_cv = clean_duplicate_project_sections(original_cv)
-        
-        # Get manual projects from database
-        cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at ASC")
-        manual_projects = cursor.fetchall()
-        
-        new_projects = []
-        for project_row in manual_projects:
-            try:
-                project_data = json.loads(project_row[0])
-                new_projects.append(project_data)
-            except:
-                pass
-        
-        # Parse CV sections
-        sections = parse_cv_sections(original_cv)
-        cv_lines = original_cv.split('\n')
-        
-        # Extract existing projects from the CV text
-        existing_projects = extract_existing_projects_from_cv(original_cv, sections)
-        
-        # Merge existing projects with new projects
-        all_projects = existing_projects + new_projects
-        
-        if not all_projects:
-            conn.close()
-            return original_cv
-        
-        # Generate properly formatted projects content
-        projects_content = []
-        for i, project in enumerate(all_projects, 1):
-            # Format each project consistently
-            title = project.get('title', f'Project {i}')
-            duration = project.get('duration', '')
-            description = project.get('description', '')
-            technologies = project.get('technologies', [])
-            highlights = project.get('highlights', [])
+        # Find the target section
+        if section_type in sections:
+            # Append to existing section
+            section_info = sections[section_type]
+            end_line = section_info['end_line']
             
-            # Project title with number
-            projects_content.append(f"{i}. {title}")
-            
-            # Duration if available
-            if duration:
-                projects_content.append(f"   Duration: {duration}")
-            
-            # Description if available
-            if description:
-                projects_content.append(f"   Description: {description}")
-            
-            # Technologies if available
-            if technologies:
-                tech_str = ', '.join(technologies) if isinstance(technologies, list) else str(technologies)
-                projects_content.append(f"   Technologies: {tech_str}")
-            
-            # Key highlights if available
-            if highlights:
-                projects_content.append("   Key Highlights:")
-                if isinstance(highlights, list):
-                    for highlight in highlights:
-                        projects_content.append(f"   • {highlight}")
-                else:
-                    projects_content.append(f"   • {highlights}")
-            
-            # Empty line between projects
-            projects_content.append("")
-        
-        # Update the projects section
-        if 'projects' in sections:
-            # Replace the content of existing projects section
-            start_line = sections['projects']['content_start']
-            end_line = sections['projects']['end_line']
-            
-            # Remove old project content but keep the header
-            del cv_lines[start_line:end_line + 1]
-            
-            # Insert updated projects content
-            for i, line in enumerate(projects_content):
-                cv_lines.insert(start_line + i, line)
+            # Insert new content before the next section starts
+            for i, line in enumerate(reversed(new_content)):
+                cv_lines.insert(end_line + 1, line)
         else:
-            # Create new projects section if it doesn't exist
-            projects_header = "\nPROJECTS"
-            full_projects_content = [projects_header] + projects_content
+            # Create new section at appropriate location
+            section_headers = {
+                'skills': 'SKILLS',
+                'experience': 'WORK EXPERIENCE', 
+                'education': 'EDUCATION',
+                'projects': 'PROJECTS'
+            }
             
-            # Find best insertion point (after experience, before education)
+            header = section_headers.get(section_type, section_type.upper())
+            full_content = [f"\n{header}"] + new_content + [""]
+            
+            # Determine best insertion point based on standard CV order
+            cv_order = ['skills', 'experience', 'education', 'projects']
+            current_index = cv_order.index(section_type) if section_type in cv_order else len(cv_order)
+            
+            # Find insertion point based on existing sections
             insert_pos = len(cv_lines)
-            if 'education' in sections:
-                insert_pos = sections['education']['start_line']
-            elif 'experience' in sections:
-                insert_pos = sections['experience']['end_line'] + 1
+            for i in range(current_index + 1, len(cv_order)):
+                next_section = cv_order[i]
+                if next_section in sections:
+                    insert_pos = sections[next_section]['start_line']
+                    break
             
-            # Insert projects section
-            for i, line in enumerate(reversed(full_projects_content)):
+            # Insert new section
+            for i, line in enumerate(reversed(full_content)):
                 cv_lines.insert(insert_pos, line)
         
-        updated_cv = '\n'.join(cv_lines)
+        return '\n'.join(cv_lines)
         
-        # Final cleanup to remove any remaining duplicates
-        updated_cv = clean_duplicate_project_sections(updated_cv)
-        
-        # Update in database
-        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (updated_cv,))
-        conn.commit()
-        conn.close()
-        
-        return updated_cv
+    except Exception as e:
+        print(f"Error in smart section integration: {e}")
+        return cv_content
+
+def generate_cv_with_projects(cursor=None, conn=None) -> str:
+    """Generate updated CV with all projects properly integrated"""
+    try:
+        # Use provided cursor or create new connection
+        if cursor is None:
+            with get_db_cursor() as (cursor, conn):
+                return _generate_cv_with_projects_internal(cursor, conn)
+        else:
+            return _generate_cv_with_projects_internal(cursor, conn)
         
     except Exception as e:
         print(f"Error generating CV with projects: {e}")
         return "Error generating updated CV"
+
+def _generate_cv_with_projects_internal(cursor, conn) -> str:
+    """Internal implementation of CV generation with projects"""
+    # Get active CV
+    cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+    cv_row = cursor.fetchone()
+    if not cv_row:
+        # If no active CV, get the most recent one
+        cursor.execute("SELECT current_content FROM cvs ORDER BY updated_at DESC LIMIT 1")
+        cv_row = cursor.fetchone()
+    
+    if not cv_row:
+        return "No CV found. Please upload a CV first."
+    
+    original_cv = cv_row[0]
+    
+    # Clean up any existing duplicate sections first
+    original_cv = clean_duplicate_project_sections(original_cv)
+    
+    # Get manual projects from database
+    cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at ASC")
+    manual_projects = cursor.fetchall()
+    
+    new_projects = []
+    for project_row in manual_projects:
+        try:
+            project_data = json.loads(project_row[0])
+            new_projects.append(project_data)
+        except:
+            pass
+    
+    # If no new projects to add, return original CV
+    if not new_projects:
+        return original_cv
+    
+    # Parse CV sections
+    sections = parse_cv_sections(original_cv)
+    cv_lines = original_cv.split('\n')
+    
+    # Extract existing projects from the CV text (only from projects section)
+    existing_projects = extract_existing_projects_from_cv(original_cv, sections)
+    
+    # Merge existing projects with new projects (avoid duplicates)
+    all_projects = existing_projects.copy()
+    
+    # Add new projects if they don't already exist
+    existing_titles = {p.get('title', '').lower() for p in existing_projects}
+    for new_project in new_projects:
+        new_title = new_project.get('title', '').lower()
+        if new_title not in existing_titles:
+            all_projects.append(new_project)
+    
+    if not all_projects:
+        return original_cv
+    
+    # Generate properly formatted projects content
+    projects_content = []
+    for i, project in enumerate(all_projects, 1):
+        # Format each project consistently
+        title = project.get('title', f'Project {i}')
+        duration = project.get('duration', '')
+        description = project.get('description', '')
+        technologies = project.get('technologies', [])
+        highlights = project.get('highlights', [])
+        
+        # Project title with number
+        projects_content.append(f"{i}. {title}")
+        
+        # Duration if available
+        if duration:
+            projects_content.append(f"   Duration: {duration}")
+        
+        # Description if available
+        if description:
+            projects_content.append(f"   Description: {description}")
+        
+        # Technologies if available
+        if technologies:
+            tech_str = ', '.join(technologies) if isinstance(technologies, list) else str(technologies)
+            projects_content.append(f"   Technologies: {tech_str}")
+        
+        # Key highlights if available
+        if highlights:
+            projects_content.append("   Key Highlights:")
+            if isinstance(highlights, list):
+                for highlight in highlights:
+                    projects_content.append(f"   • {highlight}")
+            else:
+                projects_content.append(f"   • {highlights}")
+        
+        # Empty line between projects
+        projects_content.append("")
+    
+    # Update the projects section intelligently
+    if 'projects' in sections:
+        # Replace the content of existing projects section
+        start_line = sections['projects']['content_start']
+        end_line = sections['projects']['end_line']
+        
+        # Remove old project content but keep the header
+        del cv_lines[start_line:end_line + 1]
+        
+        # Insert updated projects content
+        for i, line in enumerate(projects_content):
+            cv_lines.insert(start_line + i, line)
+    else:
+        # Use smart section integration to create new projects section
+        updated_cv = smart_section_integration(original_cv, 'projects', projects_content)
+        cv_lines = updated_cv.split('\n')
+    
+    updated_cv = '\n'.join(cv_lines)
+    
+    # Final cleanup to remove any remaining duplicates
+    updated_cv = clean_duplicate_project_sections(updated_cv)
+    
+    # Update in database
+    cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+    
+    return updated_cv
 
 def extract_existing_projects_from_cv(cv_content: str, sections: dict) -> List[dict]:
     """Extract existing projects from CV text to preserve them"""
@@ -836,58 +958,35 @@ def enhance_cv_with_openai(original_cv: str, updates: List[tuple]) -> str:
         experiences = [u[1] for u in updates if u[0] == "experience"]
         education = [u[1] for u in updates if u[0] == "education"]
         
-        updates_text = ""
-        formatted_education = []  # Initialize before conditional blocks
+        # Use smart section integration for each type of update
+        updated_cv = original_cv
         
-        if skills: updates_text += f"Skills: {', '.join(skills)}\n"
-        if experiences: updates_text += f"Experience: {'; '.join(experiences)}\n"
-        if education: 
+        # Add skills to skills section
+        if skills:
+            skill_content = [f"• {skill}" for skill in skills]
+            updated_cv = smart_section_integration(updated_cv, 'skills', skill_content)
+        
+        # Add experience to experience section
+        if experiences:
+            exp_content = []
+            for exp in experiences:
+                exp_content.extend([f"• {exp}", ""])
+            updated_cv = smart_section_integration(updated_cv, 'experience', exp_content)
+        
+        # Add education to education section
+        if education:
+            edu_content = []
             for edu in education:
                 formatted_edu = extract_education_from_message(edu)
-                # Only add if it's not the same as original message (meaning it was properly formatted)
+                # Only add if it's properly formatted
                 if formatted_edu != edu.strip() or any(word in edu.lower() for word in ['degree', 'university', 'college', 'certification', 'phd', 'master', 'bachelor']):
-                    formatted_education.append(formatted_edu)
+                    edu_content.append(f"• {formatted_edu}")
             
-            if formatted_education:  # Only add education section if we have valid entries
-                updates_text += f"Education: {'; '.join(formatted_education)}\n"
+            if edu_content:
+                updated_cv = smart_section_integration(updated_cv, 'education', edu_content)
         
-        # Create specific instructions based on what's actually being updated
-        instructions = []
-        if skills:
-            instructions.append("- ADD new skills to existing skills section (don't replace existing skills)")
-        if experiences:
-            instructions.append("- ADD new experience to existing work experience section (don't replace existing jobs)")
-        if formatted_education:  # Only add education instructions if we have valid education
-            instructions.append("- ADD new education to existing education section maintaining the EXACT same format as existing entries")
-            instructions.append("- For education, use format: '• [Degree] [Status/Year], from [Institution]'")
+        return updated_cv
         
-        instructions_text = "\n".join(instructions)
-        
-        prompt = f"""Update this CV by integrating ONLY the new information provided below. Do not add any information that is not explicitly provided.
-
-Original CV:
-{original_cv}
-
-New Information to Add:
-{updates_text}
-
-CRITICAL INSTRUCTIONS:
-{instructions_text}
-- Keep ALL existing content unchanged (including all existing education, skills, and experience)
-- Do NOT add any information that is not in the "New Information to Add" section
-- Do NOT make up or hallucinate any additional content
-- Only update the sections that have new information provided
-- Maintain consistent formatting throughout
-- Return the complete updated CV"""
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=2000
-        )
-        
-        return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"OpenAI enhancement failed: {e}, using smart fallback")
         # Smart fallback that inserts in correct sections
@@ -975,25 +1074,35 @@ async def upload_cv(file: UploadFile = File(...)):
     try:
         cv_text = extract_text_from_file(file)
         
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT id FROM cvs LIMIT 1")
-        existing = cursor.fetchone()
-        
-        if existing:
-            cursor.execute("UPDATE cvs SET original_content = ?, current_content = ?, filename = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
-                         (cv_text, cv_text, file.filename, existing[0]))
-        else:
-            cursor.execute("INSERT INTO cvs (filename, original_content, current_content) VALUES (?, ?, ?)", 
-                         (file.filename, cv_text, cv_text))
-        
-        conn.commit()
-        conn.close()
+        with get_db_cursor() as (cursor, conn):
+            # Generate a title from filename
+            title = file.filename.replace('.pdf', '').replace('.docx', '').replace('.txt', '').replace('_', ' ').title()
+            
+            # Extract projects from uploaded CV and store them
+            try:
+                existing_projects = extract_projects_from_cv(cv_text)
+                for project in existing_projects:
+                    # Check if project already exists to avoid duplicates
+                    cursor.execute("SELECT COUNT(*) FROM manual_projects WHERE project_data LIKE ?", 
+                                 (f'%{project.get("title", "")}%',))
+                    if cursor.fetchone()[0] == 0:
+                        cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
+                                     (json.dumps(project),))
+            except Exception as e:
+                print(f"Error extracting projects from uploaded CV: {e}")
+            
+            # Set all other CVs as inactive
+            cursor.execute("UPDATE cvs SET is_active = FALSE")
+            
+            # Insert new CV as active
+            cursor.execute('''INSERT INTO cvs (title, filename, original_content, current_content, is_active) 
+                             VALUES (?, ?, ?, ?, TRUE)''', 
+                          (title, file.filename, cv_text, cv_text))
         
         return JSONResponse(status_code=200, content={
-            "message": "CV uploaded successfully! Start chatting to add updates.", 
-            "filename": file.filename
+            "message": "CV uploaded successfully! Projects automatically extracted and ready for enhancement.", 
+            "filename": file.filename,
+            "title": title
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
@@ -1001,142 +1110,341 @@ async def upload_cv(file: UploadFile = File(...)):
 @app.post("/chat/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
+                          (request.message, "user"))
         
-        cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
-                      (request.message, "user"))
-        
-        classification = classify_message(request.message)
-        category = classification.get("category", "OTHER")
-        extracted_info = classification.get("extracted_info")
-        
-        response_text = ""
-        
-        if category == "CV_REQUEST":
-            # Generate CV with projects
-            updated_cv = generate_cv_with_projects()
-            response_text = "✅ Generated your enhanced CV with all projects included! Check the CV panel."
+            classification = classify_message(request.message)
+            category = classification.get("category", "OTHER")
+            extracted_info = classification.get("extracted_info")
             
-        elif category == "PROJECT_ADD":
-            # Extract project from message and save
-            project_data = extract_project_from_message(extracted_info)
-            cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
-                         (json.dumps(project_data),))
-            response_text = f"🚀 Added project '{project_data['title']}' successfully! Say 'generate CV' to include it in your CV."
+            response_text = ""
             
-        elif category == "PROJECT_LIST":
-            # List all projects
-            cursor.execute("SELECT id, project_data FROM manual_projects ORDER BY created_at DESC")
-            manual_projects = cursor.fetchall()
-            
-            if manual_projects:
-                response_text = "📂 Your Projects:\n\n"
-                for i, (project_id, project_json) in enumerate(manual_projects, 1):
-                    try:
-                        project = json.loads(project_json)
-                        response_text += f"{i}. {project.get('title', 'Untitled')} (ID: {project_id})\n"
-                        response_text += f"   Technologies: {', '.join(project.get('technologies', []))}\n\n"
-                    except:
-                        pass
-                response_text += "To modify a project, say 'update project [ID]' or 'delete project [ID]'"
-            else:
-                response_text = "📭 No projects found. Tell me about a project you've worked on!"
+            if category == "CV_REQUEST":
+                # Generate CV with projects using existing cursor
+                updated_cv = generate_cv_with_projects(cursor, conn)
+                response_text = "✅ Generated your enhanced CV with all projects included! Check the CV panel."
                 
-        elif category == "PROJECT_DELETE":
-            # Extract project ID from message
-            id_match = re.search(r'\b(\d+)\b', extracted_info)
-            if id_match:
-                project_id = int(id_match.group(1))
-                cursor.execute("DELETE FROM manual_projects WHERE id = ?", (project_id,))
-                if cursor.rowcount > 0:
-                    response_text = f"🗑️ Deleted project with ID {project_id} successfully!"
+            elif category == "PROJECT_ADD":
+                # Extract project from message and save
+                project_data = extract_project_from_message(extracted_info)
+                cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
+                             (json.dumps(project_data),))
+                response_text = f"🚀 Added project '{project_data['title']}' successfully! Say 'generate CV' to include it in your CV."
+                
+            elif category == "PROJECT_LIST":
+                # List all projects
+                cursor.execute("SELECT id, project_data FROM manual_projects ORDER BY created_at DESC")
+                manual_projects = cursor.fetchall()
+                
+                if manual_projects:
+                    response_text = "📂 Your Projects:\n\n"
+                    for i, (project_id, project_json) in enumerate(manual_projects, 1):
+                        try:
+                            project = json.loads(project_json)
+                            response_text += f"{i}. {project.get('title', 'Untitled')} (ID: {project_id})\n"
+                            response_text += f"   Technologies: {', '.join(project.get('technologies', []))}\n\n"
+                        except:
+                            pass
+                    response_text += "To modify a project, say 'update project [ID]' or 'delete project [ID]'"
                 else:
-                    response_text = f"❌ Project with ID {project_id} not found."
-            else:
-                response_text = "Please specify the project ID to delete (e.g., 'delete project 1')"
+                    response_text = "📭 No projects found. Tell me about a project you've worked on!"
+                    
+            elif category == "PROJECT_DELETE":
+                # Extract project ID from message
+                id_match = re.search(r'\b(\d+)\b', extracted_info)
+                if id_match:
+                    project_id = int(id_match.group(1))
+                    cursor.execute("DELETE FROM manual_projects WHERE id = ?", (project_id,))
+                    if cursor.rowcount > 0:
+                        response_text = f"🗑️ Deleted project with ID {project_id} successfully!"
+                    else:
+                        response_text = f"❌ Project with ID {project_id} not found."
+                else:
+                    response_text = "Please specify the project ID to delete (e.g., 'delete project 1')"
+                    
+            elif category == "PROJECT_MODIFY":
+                response_text = "🔧 To modify a project, please specify the project ID and what you want to change. For example: 'Update project 1 - change title to Mobile App'"
                 
-        elif category == "PROJECT_MODIFY":
-            response_text = "🔧 To modify a project, please specify the project ID and what you want to change. For example: 'Update project 1 - change title to Mobile App'"
-            
-        elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE"]:
-            update_type = category.replace("_UPDATE", "").lower()
-            cursor.execute("INSERT INTO cv_updates (update_type, content, original_message, processed) VALUES (?, ?, ?, ?)", 
-                         (update_type, extracted_info, request.message, False))
-            response_text = f"💡 Saved your {update_type}! Say 'generate CV' when ready to create updated CV."
-            
-        elif category == "CV_CLEANUP":
-            response_text = "🧹 Cleaning up duplicate sections in your CV. This might take a moment..."
-            # Clean up duplicate sections in the current CV content
-            cleaned_cv = clean_duplicate_project_sections(generate_cv_with_projects()) # Regenerate and clean
-            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (cleaned_cv,))
-            response_text += "✅ CV cleaned up successfully! Your CV is now free of duplicate sections."
-            
-        else:
-            response_text = """👋 I can help you with:
-            
-📋 **CV Management:**
-• "Generate CV" - Create updated CV with projects
-• "Show CV" - Display current CV
-• "Clean CV" - Remove duplicate sections
+            elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE"]:
+                update_type = category.replace("_UPDATE", "").lower()
+                cursor.execute("INSERT INTO cv_updates (update_type, content, original_message, processed) VALUES (?, ?, ?, ?)", 
+                             (update_type, extracted_info, request.message, False))
+                response_text = f"💡 Saved your {update_type}! Say 'generate CV' when ready to create updated CV."
+                
+            elif category == "CV_CLEANUP":
+                response_text = "🧹 Cleaning up duplicate sections in your CV. This might take a moment..."
+                # Clean up duplicate sections in the current CV content
+                cleaned_cv = clean_duplicate_project_sections(generate_cv_with_projects(cursor, conn)) # Regenerate and clean
+                cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (cleaned_cv,))
+                response_text += "✅ CV cleaned up successfully! Your CV is now free of duplicate sections."
+                
+            else:
+                response_text = """👋 I can help you with:
+                
+    📋 **CV Management:**
+    • "Generate CV" - Create updated CV with projects
+    • "Show CV" - Display current CV
+    • "Clean CV" - Remove duplicate sections
 
-🚀 **Project Management:**
-• "I built a React app..." - Add new project
-• "Show my projects" - List all projects  
-• "Delete project 1" - Remove project
-• "Update project 1" - Modify project
+    🚀 **Project Management:**
+    • "I built a React app..." - Add new project
+    • "Show my projects" - List all projects  
+    • "Delete project 1" - Remove project
+    • "Update project 1" - Modify project
 
-💼 **Profile Updates:**
-• "I learned Python" - Add skills
-• "I worked at..." - Add experience
-• "I got certified in..." - Add education
+    💼 **Profile Updates:**
+    • "I learned Python" - Add skills
+    • "I worked at..." - Add experience
+    • "I got certified in..." - Add education
 
-Just tell me what you want to add or update! 😊"""
+    Just tell me what you want to add or update! 😊"""
         
-        cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
-                      (response_text, "bot"))
-        
-        conn.commit()
-        conn.close()
-        
-        return ChatResponse(response=response_text, status="success")
+            cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
+                          (response_text, "bot"))
+            
+            return ChatResponse(response=response_text, status="success")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/cv/current/", response_model=CVResponse)
 async def get_current_cv():
     try:
+        with get_db_cursor() as (cursor, conn):
+            # Get the active CV
+            cursor.execute("SELECT filename, current_content, updated_at FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                # If no active CV, get the most recent one
+                cursor.execute("SELECT filename, current_content, updated_at FROM cvs ORDER BY updated_at DESC LIMIT 1")
+                cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+            
+            filename, current_content, updated_at = cv_row
+            
+            cursor.execute("SELECT update_type, content FROM cv_updates WHERE processed = FALSE ORDER BY created_at")
+            updates = cursor.fetchall()
+            
+            if updates:
+                updated_cv = enhance_cv_with_openai(current_content, updates)
+                cursor.execute("UPDATE cv_updates SET processed = TRUE")
+                cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+            else:
+                updated_cv = current_content
+            
+            # Ensure CV is regenerated with current projects only (removes deleted projects)
+            updated_cv = generate_cv_with_projects(cursor, conn)
+            
+            # Format with AI for better presentation
+            formatted_cv = format_cv_with_ai(updated_cv)
+            
+            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (formatted_cv,))
+            
+            return CVResponse(content=formatted_cv, filename=filename, last_updated=updated_at)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+# New CV Management Endpoints
+@app.get("/cvs/")
+async def list_all_cvs():
+    """Get list of all CVs with metadata"""
+    try:
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute('''SELECT id, title, filename, created_at, updated_at, is_active 
+                             FROM cvs ORDER BY updated_at DESC''')
+            cvs = cursor.fetchall()
+            
+            cv_list = []
+            for cv in cvs:
+                cv_id, title, filename, created_at, updated_at, is_active = cv
+                cv_list.append({
+                    "id": cv_id,
+                    "title": title,
+                    "filename": filename,
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "is_active": bool(is_active)
+                })
+            
+            return {"cvs": cv_list, "total_count": len(cv_list)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.get("/cvs/{cv_id}")
+async def get_cv_by_id(cv_id: int):
+    """Get specific CV by ID"""
+    try:
         conn = sqlite3.connect('cv_updater.db')
         cursor = conn.cursor()
         
-        cursor.execute("SELECT filename, current_content, updated_at FROM cvs LIMIT 1")
+        cursor.execute('''SELECT id, title, filename, current_content, created_at, updated_at, is_active 
+                         FROM cvs WHERE id = ?''', (cv_id,))
         cv_row = cursor.fetchone()
+        conn.close()
         
         if not cv_row:
-            raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+            raise HTTPException(status_code=404, detail="CV not found")
         
-        filename, current_content, updated_at = cv_row
+        cv_id, title, filename, content, created_at, updated_at, is_active = cv_row
         
-        cursor.execute("SELECT update_type, content FROM cv_updates WHERE processed = FALSE ORDER BY created_at")
-        updates = cursor.fetchall()
+        return {
+            "id": cv_id,
+            "title": title,
+            "filename": filename,
+            "content": content,
+            "created_at": created_at,
+            "updated_at": updated_at,
+            "is_active": bool(is_active)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+class CVUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+@app.put("/cvs/{cv_id}")
+async def update_cv(cv_id: int, cv_data: CVUpdateRequest):
+    """Update CV title and/or content"""
+    try:
+        conn = sqlite3.connect('cv_updater.db')
+        cursor = conn.cursor()
         
-        if updates:
-            updated_cv = enhance_cv_with_openai(current_content, updates)
-            cursor.execute("UPDATE cv_updates SET processed = TRUE")
-            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (updated_cv,))
-        else:
-            updated_cv = current_content
+        # Check if CV exists
+        cursor.execute("SELECT id FROM cvs WHERE id = ?", (cv_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="CV not found")
         
-        # Ensure CV is regenerated with current projects only (removes deleted projects)
-        updated_cv = generate_cv_with_projects()
-        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (updated_cv,))
+        # Update fields that are provided
+        update_fields = []
+        params = []
+        
+        if cv_data.title is not None:
+            update_fields.append("title = ?")
+            params.append(cv_data.title)
+            
+        if cv_data.content is not None:
+            update_fields.append("current_content = ?")
+            params.append(cv_data.content)
+        
+        if update_fields:
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(cv_id)
+            
+            query = f"UPDATE cvs SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, params)
         
         conn.commit()
         conn.close()
         
-        return CVResponse(content=updated_cv, filename=filename, last_updated=updated_at)
+        return {"message": "CV updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.delete("/cvs/{cv_id}")
+async def delete_cv(cv_id: int):
+    """Delete a CV"""
+    try:
+        conn = sqlite3.connect('cv_updater.db')
+        cursor = conn.cursor()
+        
+        # Check if CV exists
+        cursor.execute("SELECT is_active FROM cvs WHERE id = ?", (cv_id,))
+        cv_row = cursor.fetchone()
+        
+        if not cv_row:
+            raise HTTPException(status_code=404, detail="CV not found")
+        
+        was_active = cv_row[0]
+        
+        # Delete the CV
+        cursor.execute("DELETE FROM cvs WHERE id = ?", (cv_id,))
+        
+        # If the deleted CV was active, make the most recent CV active
+        if was_active:
+            cursor.execute('''UPDATE cvs SET is_active = TRUE 
+                             WHERE id = (SELECT id FROM cvs ORDER BY updated_at DESC LIMIT 1)''')
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "CV deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.post("/cvs/{cv_id}/activate")
+async def activate_cv(cv_id: int):
+    """Set a CV as the active one"""
+    try:
+        conn = sqlite3.connect('cv_updater.db')
+        cursor = conn.cursor()
+        
+        # Check if CV exists
+        cursor.execute("SELECT id FROM cvs WHERE id = ?", (cv_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="CV not found")
+        
+        # Set all CVs as inactive
+        cursor.execute("UPDATE cvs SET is_active = FALSE")
+        
+        # Set the specified CV as active
+        cursor.execute("UPDATE cvs SET is_active = TRUE WHERE id = ?", (cv_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "CV activated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.post("/cvs/{cv_id}/download")
+async def download_cv_by_id(cv_id: int):
+    """Download a specific CV as PDF"""
+    try:
+        conn = sqlite3.connect('cv_updater.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''SELECT title, current_content FROM cvs WHERE id = ?''', (cv_id,))
+        cv_row = cursor.fetchone()
+        conn.close()
+        
+        if not cv_row:
+            raise HTTPException(status_code=404, detail="CV not found")
+        
+        title, content = cv_row
+        
+        # Format CV with AI for better structure
+        formatted_content = format_cv_with_ai(content)
+        
+        # Generate PDF file
+        pdf_buffer = generate_cv_pdf(formatted_content, [])
+        pdf_content = pdf_buffer.getvalue()
+        
+        # Generate filename from title
+        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{safe_title}_{timestamp}.pdf"
+        
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                "Content-Length": str(len(pdf_content)),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Content-Type": "application/pdf",
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error generating CV PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error downloading CV: {str(e)}")
 
 @app.get("/chat/history/")
 async def get_chat_history():
@@ -1160,58 +1468,49 @@ class ProjectRequest(BaseModel):
 @app.get("/projects/")
 async def get_projects():
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # First check for manually created projects
-        cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
-        manual_projects = cursor.fetchall()
-        
-        projects = []
-        for project_row in manual_projects:
-            try:
-                project_data = json.loads(project_row[0])
-                projects.append(project_data)
-            except:
-                pass
-        
-        # Only return manual projects from database to ensure deleted projects are excluded
-        # Note: We skip CV extraction to avoid showing deleted projects
-        
-        conn.close()
-        
-        return {"projects": projects, "total_count": len(projects)}
+        with get_db_cursor() as (cursor, conn):
+            # First check for manually created projects
+            cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
+            manual_projects = cursor.fetchall()
+            
+            projects = []
+            for project_row in manual_projects:
+                try:
+                    project_data = json.loads(project_row[0])
+                    projects.append(project_data)
+                except:
+                    pass
+            
+            # Only return manual projects from database to ensure deleted projects are excluded
+            # Note: We skip CV extraction to avoid showing deleted projects
+            
+            return {"projects": projects, "total_count": len(projects)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.post("/projects/")
 async def create_project(project: ProjectRequest):
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # Create manual_projects table if it doesn't exist
-        cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_data TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )''')
-        
-        project_data = {
-            "title": project.title,
-            "description": project.description,
-            "duration": project.duration,
-            "technologies": project.technologies,
-            "highlights": project.highlights
-        }
-        
-        cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
-                      (json.dumps(project_data),))
-        
-        conn.commit()
-        conn.close()
-        
-        return {"message": "Project created successfully", "project": project_data}
+        with get_db_cursor() as (cursor, conn):
+            # Create manual_projects table if it doesn't exist
+            cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            
+            project_data = {
+                "title": project.title,
+                "description": project.description,
+                "duration": project.duration,
+                "technologies": project.technologies,
+                "highlights": project.highlights
+            }
+            
+            cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
+                          (json.dumps(project_data),))
+            
+            return {"message": "Project created successfully", "project": project_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -1245,18 +1544,13 @@ async def update_project(project_id: int, project: ProjectRequest):
 @app.delete("/projects/{project_id}")
 async def delete_project(project_id: int):
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        cursor.execute("DELETE FROM manual_projects WHERE id = ?", (project_id,))
-        
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Project not found")
-        
-        conn.commit()
-        conn.close()
-        
-        return {"message": "Project deleted successfully"}
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("DELETE FROM manual_projects WHERE id = ?", (project_id,))
+            
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Project not found")
+            
+            return {"message": "Project deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -1288,30 +1582,31 @@ async def list_projects_with_ids():
 async def cleanup_cv():
     """Clean up duplicate sections in the CV"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # Get current CV
-        cursor.execute("SELECT current_content FROM cvs LIMIT 1")
-        cv_row = cursor.fetchone()
-        
-        if not cv_row:
-            raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
-        
-        current_cv = cv_row[0]
-        
-        # Clean up duplicate sections
-        cleaned_cv = clean_duplicate_project_sections(current_cv)
-        
-        # Regenerate with proper formatting
-        cleaned_cv = generate_cv_with_projects()
-        
-        # Update in database
-        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (cleaned_cv,))
-        conn.commit()
-        conn.close()
-        
-        return {"message": "CV cleaned up successfully! All duplicate sections removed.", "cv_content": cleaned_cv}
+        with get_db_cursor() as (cursor, conn):
+            # Get current active CV
+            cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                # If no active CV, get the most recent one
+                cursor.execute("SELECT current_content FROM cvs ORDER BY updated_at DESC LIMIT 1")
+                cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+            
+            current_cv = cv_row[0]
+            
+            # Clean up duplicate sections
+            cleaned_cv = clean_duplicate_project_sections(current_cv)
+            
+            # Regenerate with proper formatting using existing cursor
+            cleaned_cv = generate_cv_with_projects(cursor, conn)
+            
+            # Update in database
+            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (cleaned_cv,))
+            
+            return {"message": "CV cleaned up successfully! All duplicate sections removed.", "cv_content": cleaned_cv}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error cleaning up CV: {str(e)}")
@@ -1319,8 +1614,9 @@ async def cleanup_cv():
 @app.post("/cv/generate")
 async def generate_updated_cv():
     try:
-        updated_cv = generate_cv_with_projects()
-        return {"message": "CV generated successfully", "cv_content": updated_cv}
+        with get_db_cursor() as (cursor, conn):
+            updated_cv = generate_cv_with_projects(cursor, conn)
+            return {"message": "CV generated successfully", "cv_content": updated_cv}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -1486,20 +1782,22 @@ async def create_cv_from_builder(cv_data: CVBuilderRequest):
         # Generate CV text from structured data
         cv_text = generate_cv_text_from_data(cv_data.dict())
         
+        # Generate title from personal info
+        personal_info = cv_data.personal_info
+        title = f"{personal_info.get('full_name', 'Professional')} CV"
+        filename = f"cv_builder_{personal_info.get('full_name', 'professional').lower().replace(' ', '_')}.txt"
+        
         # Store in database
         conn = sqlite3.connect('cv_updater.db')
         cursor = conn.cursor()
         
-        # Clear existing CV data
-        cursor.execute("DELETE FROM cvs")
-        cursor.execute("DELETE FROM manual_projects")
-        cursor.execute("DELETE FROM chat_messages")
-        cursor.execute("DELETE FROM cv_updates")
+        # Set all other CVs as inactive
+        cursor.execute("UPDATE cvs SET is_active = FALSE")
         
-        # Insert new CV
-        cursor.execute('''INSERT INTO cvs (filename, original_content, current_content) 
-                         VALUES (?, ?, ?)''', 
-                      ('cv_builder_generated.txt', cv_text, cv_text))
+        # Insert new CV as active
+        cursor.execute('''INSERT INTO cvs (title, filename, original_content, current_content, is_active) 
+                         VALUES (?, ?, ?, ?, TRUE)''', 
+                      (title, filename, cv_text, cv_text))
         
         # Store projects separately
         for project in cv_data.projects:
@@ -1512,6 +1810,7 @@ async def create_cv_from_builder(cv_data: CVBuilderRequest):
         return {
             "message": "CV created successfully from CV Builder",
             "cv_content": cv_text,
+            "title": title,
             "status": "success"
         }
         
@@ -1660,6 +1959,38 @@ async def generate_blog_post(request: BlogRequest):
             "blog_content": f"Sorry, I encountered an error while generating the blog: {str(e)}",
             "project_title": request.project_title
         }
+
+def format_cv_with_ai(cv_content: str) -> str:
+    """Use AI to format CV content into well-structured sections"""
+    try:
+        prompt = f"""Format this CV content into a professional, well-structured format with clear sections. Organize the content properly and ensure consistent formatting.
+
+CV Content:
+{cv_content}
+
+Please format the CV with:
+1. Clear section headers (PROFILE SUMMARY, SKILLS, WORK EXPERIENCE, EDUCATION, PROJECTS)
+2. Consistent bullet points and formatting
+3. Proper spacing between sections
+4. Professional language and structure
+5. Remove any duplicate sections or content
+6. Ensure all content is relevant and well-organized
+
+Return only the formatted CV content, no additional commentary."""
+
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=2000
+        )
+        
+        formatted_content = response.choices[0].message.content.strip()
+        return formatted_content
+        
+    except Exception as e:
+        print(f"AI formatting failed: {e}")
+        return cv_content  # Return original if AI fails
 
 def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
     """Generate a modern, professional PDF CV with all projects"""
@@ -1926,14 +2257,18 @@ async def download_cv():
         
         # Regenerate CV with current projects to ensure everything is up to date
         updated_cv = generate_cv_with_projects()
+        
+        # Format CV with AI for better structure
+        formatted_cv = format_cv_with_ai(updated_cv)
+        
         # Update the database with the clean CV
-        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (updated_cv,))
+        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (formatted_cv,))
         
         conn.commit()
         conn.close()
         
         # Generate PDF file - don't pass projects since they're already in CV content
-        pdf_buffer = generate_cv_pdf(updated_cv, [])  # Empty list prevents duplication
+        pdf_buffer = generate_cv_pdf(formatted_cv, [])  # Empty list prevents duplication
         pdf_content = pdf_buffer.getvalue()
         
         # Generate a proper filename

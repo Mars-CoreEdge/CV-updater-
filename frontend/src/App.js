@@ -6,6 +6,7 @@ import ChatInterface from './components/ChatInterface';
 import CVDisplay from './components/CVDisplay';
 import ProjectsPage from './pages/ProjectsPage';
 import CVBuilderPage from './pages/CVBuilderPage';
+import CVManagementPage from './pages/CVManagementPage';
 import './App.css';
 
 const AppContainer = styled.div`
@@ -397,6 +398,13 @@ function CVUpdaterContent() {
                 </div>
               </NavButton>
               
+              <NavButton onClick={() => navigate('/cv-management')}>
+                <div className="button-content">
+                  <span className="icon">📋</span>
+                  Manage My CVs
+                </div>
+              </NavButton>
+              
               {cvUploaded && (
                 <NavButton onClick={() => navigate('/projects')}>
                   <div className="button-content">
@@ -427,6 +435,7 @@ function App() {
         <Route path="/" element={<CVUpdaterContent />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/cv-builder" element={<CVBuilderPage />} />
+        <Route path="/cv-management" element={<CVManagementPage />} />
       </Routes>
     </Router>
   );
