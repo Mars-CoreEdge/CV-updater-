@@ -5,8 +5,22 @@ import axios from 'axios';
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: 550px;
+  height: calc(100vh - 200px);
   position: relative;
+  max-height: calc(100vh - 200px);
+  min-height: 450px;
+  
+  @media (max-width: 1200px) {
+    height: calc(100vh - 220px);
+    max-height: calc(100vh - 220px);
+    min-height: 400px;
+  }
+  
+  @media (max-width: 768px) {
+    height: calc(100vh - 180px);
+    max-height: calc(100vh - 180px);
+    min-height: 350px;
+  }
 `;
 
 const Title = styled.h2`
@@ -37,38 +51,59 @@ const QuickActionsContainer = styled.div`
 `;
 
 const QuickActionButton = styled.button`
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: var(--bg-card);
+  border: 1px solid rgba(139, 92, 246, 0.12);
   color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-xl);
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-spring);
   flex: 1;
-  min-width: 120px;
+  min-width: 130px;
   position: relative;
   overflow: hidden;
+  backdrop-filter: var(--backdrop-blur-sm);
+  box-shadow: var(--shadow-xs);
   
   &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--primary-gradient);
+    opacity: 0;
+    transition: var(--transition-smooth);
+    z-index: 0;
+  }
+  
+  &::after {
     content: '';
     position: absolute;
     top: 0;
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
-    transition: left 0.5s ease;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transition: var(--transition-smooth);
+    z-index: 1;
   }
   
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-    border-color: rgba(102, 126, 234, 0.5);
-    transform: translateY(-2px);
+    border-color: rgba(139, 92, 246, 0.3);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: var(--shadow-md);
+    color: white;
   }
   
   &:hover:not(:disabled)::before {
+    opacity: 1;
+  }
+  
+  &:hover:not(:disabled)::after {
     left: 100%;
   }
   
@@ -81,66 +116,108 @@ const QuickActionButton = styled.button`
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: var(--spacing-xs);
+    position: relative;
+    z-index: 2;
+  }
+  
+  @media (max-width: 768px) {
+    min-width: 110px;
+    font-size: 0.8rem;
+    padding: 6px 10px;
   }
 `;
 
 const GenerateCVButton = styled.button`
-  background: linear-gradient(135deg, #28a745, #20c997);
+  background: var(--success-gradient);
   color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--border-radius-xl);
+  font-size: 0.95rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--transition-spring);
   width: 100%;
-  margin-bottom: 15px;
-  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-glow-success);
   position: relative;
   overflow: hidden;
+  backdrop-filter: var(--backdrop-blur-sm);
+  letter-spacing: 0.01em;
   
   &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    opacity: 0;
+    transition: var(--transition-smooth);
+  }
+  
+  &::after {
     content: '';
     position: absolute;
     top: 0;
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: left 0.5s ease;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transition: var(--transition-smooth);
   }
   
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #218838, #1ea384);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 
+      var(--shadow-glow-success),
+      0 15px 35px rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.4);
   }
   
   &:hover:not(:disabled)::before {
+    opacity: 1;
+  }
+  
+  &:hover:not(:disabled)::after {
     left: 100%;
   }
   
   &:active {
-    transform: translateY(-1px);
+    transform: translateY(-1px) scale(1.01);
   }
   
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+    box-shadow: var(--shadow-sm);
   }
   
   .button-content {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--spacing-sm);
+    position: relative;
+    z-index: 1;
   }
   
   .icon {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
+    animation: iconPulse 2s ease-in-out infinite;
+  }
+  
+  @keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  
+  @media (max-width: 768px) {
+    font-size: 0.9rem;
+    padding: var(--spacing-sm) var(--spacing-md);
   }
 `;
 
@@ -151,7 +228,7 @@ const MessagesContainer = styled.div`
   background: linear-gradient(135deg, #f8f9fa, #ffffff);
   border-radius: 16px;
   margin-bottom: 20px;
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.1);
   position: relative;
   
   &::before {
@@ -291,7 +368,7 @@ const TypingIndicator = styled.div`
 
 const TypingBubble = styled.div`
   background: linear-gradient(135deg, #ffffff, #f8f9fa);
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.1);
   border-radius: 20px 20px 20px 4px;
   padding: 16px 20px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
@@ -439,9 +516,9 @@ const PlaceholderMessage = styled.div`
   color: var(--text-secondary);
   font-style: italic;
   padding: 40px 30px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.03), rgba(118, 75, 162, 0.03));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.03), rgba(168, 85, 247, 0.03));
   border-radius: 12px;
-  border: 2px dashed rgba(102, 126, 234, 0.2);
+  border: 2px dashed rgba(139, 92, 246, 0.2);
   
   .placeholder-icon {
     font-size: 3rem;
@@ -489,7 +566,7 @@ const StatusIndicator = styled.div`
   padding: 4px 12px;
   font-size: 0.75rem;
   color: var(--text-secondary);
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.1);
   animation: fadeInUp 0.3s ease-out;
   
   .status-dot {
@@ -553,7 +630,16 @@ function ChatInterface({ cvUploaded, onChatUpdate }) {
       };
 
       setMessages(prev => [...prev, botMessage]);
-      onChatUpdate();
+      
+      // Check if the response indicates a CV update and trigger refresh
+      const responseText = response.data.response.toLowerCase();
+      const isUpdateResponse = responseText.includes('updated your') && 
+                              (responseText.includes('education') || 
+                               responseText.includes('skills') || 
+                               responseText.includes('experience') ||
+                               responseText.includes('section successfully'));
+      
+      onChatUpdate(isUpdateResponse);
     } catch (error) {
       setIsTyping(false);
       const errorMessage = {
@@ -581,7 +667,7 @@ function ChatInterface({ cvUploaded, onChatUpdate }) {
       };
       
       setMessages(prev => [...prev, successMessage]);
-      onChatUpdate();
+      onChatUpdate(true); // Force CV refresh after CV generation
     } catch (error) {
       const errorMessage = {
         id: Date.now(),

@@ -5,6 +5,31 @@ from pydantic import BaseModel
 import sqlite3
 import PyPDF2
 import docx2txt
+
+# Advanced PDF Processing Libraries
+try:
+    import fitz  # PyMuPDF
+    HAS_PYMUPDF = True
+except ImportError:
+    HAS_PYMUPDF = False
+    print("PyMuPDF not available")
+
+try:
+    import pdfplumber
+    HAS_PDFPLUMBER = True
+except ImportError:
+    HAS_PDFPLUMBER = False
+    print("pdfplumber not available")
+
+try:
+    import pytesseract
+    from PIL import Image
+    from pdf2image import convert_from_bytes
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
+    print("OCR libraries not available")
+
 from io import BytesIO
 import openai
 import json
@@ -12,13 +37,6 @@ from typing import List, Optional
 import os
 import re
 from datetime import datetime
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.colors import HexColor, black, blue, darkblue
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from reportlab.lib import colors
 from fastapi.responses import Response
 
 # OpenAI setup
@@ -165,11 +183,7 @@ def extract_text_from_file(file: UploadFile) -> str:
     content = file.file.read()
     
     if file.filename.endswith('.pdf'):
-        pdf_reader = PyPDF2.PdfFileReader(BytesIO(content))
-        text = ""
-        for page_num in range(pdf_reader.getNumPages()):
-            text += pdf_reader.getPage(page_num).extractText() + "\n"
-        return text
+        return extract_text_from_pdf(content)
     elif file.filename.endswith('.docx'):
         return docx2txt.process(BytesIO(content))
     elif file.filename.endswith('.txt'):
@@ -177,33 +191,147 @@ def extract_text_from_file(file: UploadFile) -> str:
     else:
         raise HTTPException(status_code=400, detail="Unsupported file format")
 
-def classify_message(message: str) -> dict:
+def extract_text_from_pdf(pdf_content: bytes) -> str:
+    """Enhanced PDF text extraction with multiple fallback methods"""
+    
+    # Method 1: Try PyMuPDF (fastest and most accurate)
+    if HAS_PYMUPDF:
+        try:
+            text = extract_text_with_pymupdf(pdf_content)
+            if text and text.strip():
+                print("✅ Text extracted successfully with PyMuPDF")
+                return text
+        except Exception as e:
+            print(f"PyMuPDF extraction failed: {e}")
+    
+    # Method 2: Try pdfplumber (good for complex layouts)
+    if HAS_PDFPLUMBER:
+        try:
+            text = extract_text_with_pdfplumber(pdf_content)
+            if text and text.strip():
+                print("✅ Text extracted successfully with pdfplumber")
+                return text
+        except Exception as e:
+            print(f"pdfplumber extraction failed: {e}")
+    
+    # Method 3: Try PyPDF2 (basic fallback)
     try:
+        text = extract_text_with_pypdf2(pdf_content)
+        if text and text.strip():
+            print("✅ Text extracted successfully with PyPDF2")
+            return text
+    except Exception as e:
+        print(f"PyPDF2 extraction failed: {e}")
+    
+    # Method 4: Try OCR as last resort (for scanned PDFs)
+    if HAS_OCR:
+        try:
+            text = extract_text_with_ocr(pdf_content)
+            if text and text.strip():
+                print("✅ Text extracted successfully with OCR")
+                return text
+        except Exception as e:
+            print(f"OCR extraction failed: {e}")
+    
+    # If all methods fail
+    raise HTTPException(
+        status_code=400, 
+        detail="Could not extract text from PDF. The file might be corrupted, password-protected, or contain only images. Please try converting to TXT format."
+    )
+
+def extract_text_with_pymupdf(pdf_content: bytes) -> str:
+    """Extract text using PyMuPDF (fitz)"""
+    doc = fitz.open(stream=pdf_content, filetype="pdf")
+    text = ""
+    
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        text += page.get_text() + "\n"
+    
+    doc.close()
+    return text.strip()
+
+def extract_text_with_pdfplumber(pdf_content: bytes) -> str:
+    """Extract text using pdfplumber"""
+    text = ""
+    
+    with pdfplumber.open(BytesIO(pdf_content)) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    
+    return text.strip()
+
+def extract_text_with_pypdf2(pdf_content: bytes) -> str:
+    """Extract text using PyPDF2 (basic fallback)"""
+    pdf_reader = PyPDF2.PdfFileReader(BytesIO(pdf_content))
+    text = ""
+    
+    for page_num in range(pdf_reader.getNumPages()):
+        page = pdf_reader.getPage(page_num)
+        text += page.extractText() + "\n"
+    
+    return text.strip()
+
+def extract_text_with_ocr(pdf_content: bytes) -> str:
+    """Extract text using OCR (for scanned PDFs)"""
+    # Convert PDF to images
+    images = convert_from_bytes(pdf_content)
+    text = ""
+    
+    for i, image in enumerate(images):
+        # Use pytesseract to extract text from each page image
+        page_text = pytesseract.image_to_string(image)
+        if page_text.strip():
+            text += f"--- Page {i+1} ---\n{page_text}\n"
+    
+    return text.strip()
+
+def classify_message(message: str, cv_content: str = None) -> dict:
+    try:
+        cv_context = ""
+        if cv_content:
+            # Provide CV context to the AI
+            cv_context = f"\n\nCurrent CV Content Preview:\n{cv_content[:500]}..."
+        
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": """Classify messages:
-                CV_REQUEST: user wants updated CV ("give me", "show", "updated cv", "generate cv")
-                SKILL_UPDATE: adding skills ("learned", "skill", "achieved")
-                EXPERIENCE_UPDATE: work experience ("worked", "job", "position")
-                EDUCATION_UPDATE: education ("degree", "certification", "course")
-                PROJECT_ADD: adding new project ("project", "built", "developed", "created app")
-                PROJECT_MODIFY: modifying existing project ("update project", "change project", "modify")
-                PROJECT_DELETE: deleting project ("remove project", "delete project")
-                PROJECT_LIST: listing projects ("show projects", "list projects", "my projects")
-                CV_CLEANUP: user wants to clean up duplicate sections in CV ("clean", "cleanup", "fix", "duplicate", "remove duplicate")
-                OTHER: general conversation
-                Return JSON: {"category": "CATEGORY", "extracted_info": "info"}"""},
+                {"role": "system", "content": f"""You are a CV assistant with access to the user's current CV. Classify messages and provide intelligent responses based on CV content:
+
+CV_REQUEST: user wants updated CV ("give me", "show", "updated cv", "generate cv")
+CV_QUESTION: user asking about their CV content ("what experience do I have", "what skills", "where did I work")
+SKILL_UPDATE: adding skills ("learned", "skill", "achieved") - targets SKILLS section
+EXPERIENCE_UPDATE: work experience ("worked", "job", "position") - targets EXPERIENCE section  
+EDUCATION_UPDATE: education ("degree", "certification", "course") - targets EDUCATION section
+PROJECT_ADD: adding new project ("project", "built", "developed", "created app")
+PROJECT_MODIFY: modifying existing project ("update project", "change project", "modify")
+PROJECT_DELETE: deleting project ("remove project", "delete project")
+PROJECT_LIST: listing projects ("show projects", "list projects", "my projects")
+CV_CLEANUP: user wants to clean up duplicate sections in CV ("clean", "cleanup", "fix", "duplicate", "remove duplicate")
+OTHER: general conversation
+
+If user asks about their CV content, provide specific answers based on the CV data.
+Return JSON: {{"category": "CATEGORY", "extracted_info": "info", "target_section": "SECTION_NAME", "cv_response": "specific answer based on CV if applicable"}}{cv_context}"""},
                 {"role": "user", "content": message}
             ],
             temperature=0.1,
-            max_tokens=150
+            max_tokens=200
         )
         return json.loads(response.choices[0].message.content)
     except:
         msg = message.lower()
-        # Enhanced pattern matching
-        if any(phrase in msg for phrase in ["give me", "updated cv", "show cv", "generate cv", "create cv"]):
+        # Enhanced pattern matching with CV awareness
+        if any(phrase in msg for phrase in ["what experience", "where did i work", "what jobs", "my experience"]):
+            return {"category": "CV_QUESTION", "extracted_info": message.strip(), "cv_response": "experience"}
+        elif any(phrase in msg for phrase in ["what skills", "my skills", "what technologies", "what programming"]):
+            return {"category": "CV_QUESTION", "extracted_info": message.strip(), "cv_response": "skills"}
+        elif any(phrase in msg for phrase in ["what education", "where did i study", "my degree", "my education"]):
+            return {"category": "CV_QUESTION", "extracted_info": message.strip(), "cv_response": "education"}
+        elif any(phrase in msg for phrase in ["what projects", "my projects", "projects i built"]):
+            return {"category": "CV_QUESTION", "extracted_info": message.strip(), "cv_response": "projects"}
+        elif any(phrase in msg for phrase in ["give me", "updated cv", "show cv", "generate cv", "create cv"]):
             return {"category": "CV_REQUEST", "extracted_info": None}
         elif any(phrase in msg for phrase in ["clean", "cleanup", "fix", "duplicate", "remove duplicate"]):
             return {"category": "CV_CLEANUP", "extracted_info": None}
@@ -225,138 +353,113 @@ def classify_message(message: str) -> dict:
         else:
             return {"category": "OTHER", "extracted_info": message.strip()}
 
-def extract_projects_from_cv(cv_content: str) -> List[dict]:
+def update_cv_section_smart(cv_content: str, section_name: str, update_info: str) -> str:
+    """Update a specific section of the CV using OpenAI without creating new sections"""
     try:
-        prompt = f"""Extract all projects from this CV and return them as a JSON array. Each project should be an object with:
-- title: project name
-- description: brief description of the project
-- technologies: array of technologies used
-- duration: timeframe or date
-- highlights: array of key achievements/features
+        # Find the existing section in the CV
+        sections = parse_cv_sections(cv_content)
+        
+        if section_name.lower() not in sections:
+            # Don't create new sections, just return original CV
+            return cv_content
+            
+        # Use OpenAI to intelligently update the specific section
+        prompt = f"""You are updating a specific section of a CV. 
 
-CV Content:
+Current CV Content:
 {cv_content}
 
-Return ONLY a valid JSON array of projects. If no projects found, return an empty array []."""
+Target Section: {section_name}
+Update Information: {update_info}
+
+Instructions:
+1. Find the existing {section_name} section in the CV
+2. Update ONLY that section with the new information
+3. DO NOT create new sections
+4. Maintain the original formatting and structure
+5. Add the new information naturally to the existing section
+6. Return the complete updated CV
+
+Updated CV:"""
 
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=1500
+            temperature=0.2,
+            max_tokens=2000
         )
         
-        projects_text = response.choices[0].message.content.strip()
-        # Clean up the response to ensure it's valid JSON
-        if projects_text.startswith('```json'):
-            projects_text = projects_text[7:-3]
-        elif projects_text.startswith('```'):
-            projects_text = projects_text[3:-3]
+        updated_cv = response.choices[0].message.content.strip()
         
-        projects = json.loads(projects_text)
-        return projects if isinstance(projects, list) else []
+        # Validate that the response is a complete CV
+        if len(updated_cv) < len(cv_content) * 0.8:
+            # If the response is too short, fall back to manual section update
+            return update_cv_section_manual(cv_content, section_name, update_info)
+        
+        return updated_cv
+        
     except Exception as e:
-        print(f"Error extracting projects with OpenAI: {e}")
-        # Fallback: Pattern-based extraction
-        return extract_projects_fallback(cv_content)
+        print(f"OpenAI section update failed: {e}")
+        # Fallback to manual section update
+        return update_cv_section_manual(cv_content, section_name, update_info)
+
+def update_cv_section_manual(cv_content: str, section_name: str, update_info: str) -> str:
+    """Manual fallback for updating CV sections"""
+    sections = parse_cv_sections(cv_content)
+    
+    # Map section names to standardized names
+    section_mapping = {
+        'skills': ['skills', 'technical skills', 'core competencies', 'technologies'],
+        'experience': ['work experience', 'experience', 'professional experience', 'employment history'],
+        'education': ['education', 'educational background', 'academic background', 'qualifications']
+    }
+    
+    # Find the correct section
+    target_section = None
+    for standard_name, variations in section_mapping.items():
+        if section_name.lower() in variations:
+            for variation in variations:
+                if variation in sections:
+                    target_section = variation
+                    break
+        if target_section:
+            break
+    
+    if not target_section:
+        return cv_content
+    
+    # Get section info
+    section_info = sections[target_section]
+    lines = cv_content.split('\n')
+    
+    # Add new content at the end of the section
+    insert_position = section_info['end_line']
+    
+    # Format the new content based on section type
+    if 'skill' in section_name.lower():
+        new_content = f"• {update_info}"
+    elif 'experience' in section_name.lower():
+        new_content = f"• {update_info}"
+    elif 'education' in section_name.lower():
+        formatted_education = extract_education_from_message(update_info)
+        new_content = f"• {formatted_education}"
+    else:
+        new_content = f"• {update_info}"
+    
+    # Insert the new content
+    lines.insert(insert_position, new_content)
+    
+    return '\n'.join(lines)
+
+def extract_projects_from_cv(cv_content: str) -> List[dict]:
+    """Disabled automatic project extraction - projects must be added manually"""
+    # No longer automatically extract projects from CV content
+    return []
 
 def extract_projects_fallback(cv_content: str) -> List[dict]:
-    """Fallback method to extract projects using pattern matching"""
-    
-    projects = []
-    cv_lower = cv_content.lower()
-    
-    # Look for project indicators
-    project_patterns = [
-        r'(task management.*?application)',
-        r'(web application.*?project)',
-        r'(project.*?management.*?system)',
-        r'(rest api.*?project)',
-        r'(e-commerce.*?platform)',
-        r'(portfolio.*?website)',
-        r'(chat.*?application)',
-        r'(dashboard.*?project)',
-        r'(mobile.*?app)',
-        r'(database.*?project)'
-    ]
-    
-    # Look for technology stacks
-    tech_patterns = [
-        r'react\.?js', r'javascript', r'html', r'css', r'bootstrap',
-        r'fastapi', r'python', r'supabase', r'github', r'git',
-        r'node\.?js', r'express', r'mongodb', r'sql', r'postgresql'
-    ]
-    
-    # Extract technologies mentioned in CV
-    found_technologies = []
-    for pattern in tech_patterns:
-        matches = re.findall(pattern, cv_lower)
-        found_technologies.extend(matches)
-    
-    # Clean up and deduplicate technologies
-    technologies = list(set([tech.replace('.', '').title() for tech in found_technologies]))
-    
-    # Look for date patterns
-    date_patterns = r'(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\s,]*(\d{4})'
-    dates = re.findall(date_patterns, cv_lower, re.IGNORECASE)
-    
-    # Check if CV mentions projects or work experience
-    if any(keyword in cv_lower for keyword in ['project', 'developed', 'built', 'created', 'implemented']):
-        
-        # Project 1: Task Management Application (if mentioned)
-        if any(keyword in cv_lower for keyword in ['task management', 'web app', 'application']):
-            projects.append({
-                "title": "Task Management Web Application",
-                "description": "Developed a comprehensive web application for task management with features for creating, updating, and managing tasks with deadlines and status tracking.",
-                "technologies": [tech for tech in technologies if tech in ['React', 'Javascript', 'Html', 'Css', 'Bootstrap', 'Fastapi', 'Python']],
-                "duration": "March 2025 - April 2025" if dates else "Recent Project",
-                "highlights": [
-                    "Built responsive UI with React.js and Bootstrap",
-                    "Implemented REST APIs with FastAPI",
-                    "Integrated database for data persistence",
-                    "Added user authentication and authorization"
-                ]
-            })
-        
-        # Project 2: Full Stack Development (if backend/frontend mentioned)
-        if any(keyword in cv_lower for keyword in ['full stack', 'rest api', 'backend', 'frontend']):
-            projects.append({
-                "title": "Full Stack Web Development Platform",
-                "description": "Built a complete web development solution with front-end user interface and back-end API integration, featuring database management and user authentication.",
-                "technologies": [tech for tech in technologies if tech in ['React', 'Javascript', 'Fastapi', 'Python', 'Supabase']],
-                "duration": "2024 - 2025" if dates else "Ongoing",
-                "highlights": [
-                    "Developed responsive web applications",
-                    "Created RESTful APIs for data management",
-                    "Implemented database integration",
-                    "Collaborated with team members on version control"
-                ]
-            })
-        
-        # Project 3: Database Integration (if database mentioned)
-        if any(keyword in cv_lower for keyword in ['database', 'supabase', 'sql', 'data']):
-            projects.append({
-                "title": "Database Integration & Management System",
-                "description": "Designed and implemented database solutions for web applications with focus on data storage, retrieval, and authentication systems.",
-                "technologies": [tech for tech in technologies if tech in ['Supabase', 'Python', 'Fastapi', 'Javascript']],
-                "duration": "2024" if dates else "Recent",
-                "highlights": [
-                    "Integrated Supabase for database management",
-                    "Implemented data authentication systems",
-                    "Optimized database queries for performance",
-                    "Ensured data security and backup procedures"
-                ]
-            })
-    
-    # Remove duplicates and empty projects
-    unique_projects = []
-    seen_titles = set()
-    for project in projects:
-        if project['title'] not in seen_titles and project['technologies']:
-            seen_titles.add(project['title'])
-            unique_projects.append(project)
-    
-    return unique_projects[:3]  # Return max 3 projects to avoid duplication
+    """Fallback method - now returns empty list to prevent automatic project creation"""
+    # No longer automatically create projects from CV content
+    return []
 
 def extract_project_from_message(message: str) -> dict:
     """Extract project details from chat message using AI or patterns"""
@@ -604,7 +707,7 @@ def extract_education_fallback(message: str) -> str:
         return f"{degree_type} of {field} {status}, from {university}"
 
 def clean_duplicate_project_sections(cv_content: str) -> str:
-    """Remove duplicate project sections like ADDITIONAL PROJECTS"""
+    """Remove all project sections and additional sections"""
     lines = cv_content.split('\n')
     cleaned_lines = []
     skip_section = False
@@ -612,16 +715,17 @@ def clean_duplicate_project_sections(cv_content: str) -> str:
     for line in lines:
         line_upper = line.upper().strip()
         
-        # Check if this is an "ADDITIONAL" section header
-        if (line_upper.startswith('ADDITIONAL') and 
-            any(keyword in line_upper for keyword in ['PROJECT', 'SKILL', 'EXPERIENCE'])):
+        # Check if this is any project section or additional section
+        if (line_upper.startswith('ADDITIONAL') or 
+            (line_upper.isupper() and 'PROJECT' in line_upper)):
             skip_section = True
             continue
         
-        # Check if we're starting a new non-additional section
+        # Check if we're starting a new non-project section
         if (line_upper.isupper() and 
             any(keyword in line_upper for keyword in 
-                ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS', 'CERTIFICATION']) and
+                ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'CERTIFICATION']) and
+            'PROJECT' not in line_upper and
             not line_upper.startswith('ADDITIONAL')):
             skip_section = False
         
@@ -727,26 +831,23 @@ def _generate_cv_with_projects_internal(cursor, conn) -> str:
         except:
             pass
     
-    # If no new projects to add, return original CV
+    # If no manually added projects, remove any existing projects section and return original CV
     if not new_projects:
+        # Clean up any existing projects section
+        if 'projects' in sections:
+            # Remove the projects section entirely
+            start_line = sections['projects']['start_line']
+            end_line = sections['projects']['end_line']
+            del cv_lines[start_line:end_line + 1]
+            return '\n'.join(cv_lines)
         return original_cv
     
     # Parse CV sections
     sections = parse_cv_sections(original_cv)
     cv_lines = original_cv.split('\n')
     
-    # Extract existing projects from the CV text (only from projects section)
-    existing_projects = extract_existing_projects_from_cv(original_cv, sections)
-    
-    # Merge existing projects with new projects (avoid duplicates)
-    all_projects = existing_projects.copy()
-    
-    # Add new projects if they don't already exist
-    existing_titles = {p.get('title', '').lower() for p in existing_projects}
-    for new_project in new_projects:
-        new_title = new_project.get('title', '').lower()
-        if new_title not in existing_titles:
-            all_projects.append(new_project)
+    # Only use manually added projects (no extraction from CV content)
+    all_projects = new_projects.copy()
     
     if not all_projects:
         return original_cv
@@ -817,69 +918,57 @@ def _generate_cv_with_projects_internal(cursor, conn) -> str:
     return updated_cv
 
 def extract_existing_projects_from_cv(cv_content: str, sections: dict) -> List[dict]:
-    """Extract existing projects from CV text to preserve them"""
-    existing_projects = []
+    """No longer extract existing projects from CV - only use manually added projects"""
+    # Return empty list to prevent automatic project extraction
+    return []
+
+def extract_section_from_cv(cv_content: str, section_type: str) -> str:
+    """Extract a specific section from CV content based on actual text"""
+    if not cv_content:
+        return ""
     
-    try:
-        if 'projects' not in sections:
-            return existing_projects
-        
-        cv_lines = cv_content.split('\n')
-        start_line = sections['projects']['content_start']
-        end_line = sections['projects']['end_line']
-        
-        current_project = None
-        
-        for i in range(start_line, min(end_line + 1, len(cv_lines))):
-            line = cv_lines[i].strip()
-            
-            if not line:
-                continue
-            
-            # Check if this is a project title (starts with number)
-            title_match = re.match(r'^\d+\.\s*(.+)', line)
-            if title_match:
-                # Save previous project if exists
-                if current_project:
-                    existing_projects.append(current_project)
-                
-                # Start new project
-                current_project = {
-                    'title': title_match.group(1).strip(),
-                    'description': '',
-                    'duration': '',
-                    'technologies': [],
-                    'highlights': []
-                }
-            elif current_project:
-                # Parse project details
-                if line.lower().startswith('duration:'):
-                    current_project['duration'] = line[9:].strip()
-                elif line.lower().startswith('description:'):
-                    current_project['description'] = line[12:].strip()
-                elif line.lower().startswith('technologies:'):
-                    tech_str = line[13:].strip()
-                    current_project['technologies'] = [t.strip() for t in tech_str.split(',') if t.strip()]
-                elif line.lower().startswith('key highlights:'):
-                    continue  # Next lines will be highlights
-                elif line.startswith('•') or line.startswith('-'):
-                    # This is a highlight
-                    highlight = line[1:].strip()
-                    if highlight:
-                        current_project['highlights'].append(highlight)
-                elif not any(line.lower().startswith(prefix) for prefix in ['duration:', 'description:', 'technologies:']):
-                    # If no specific prefix, add to description if not empty
-                    if line and not current_project['description']:
-                        current_project['description'] = line
-        
-        # Add last project
-        if current_project:
-            existing_projects.append(current_project)
-        
-    except Exception as e:
-        print(f"Error extracting existing projects: {e}")
+    lines = cv_content.split('\n')
+    section_lines = []
+    in_section = False
+    section_keywords = {
+        'experience': ['experience', 'work', 'employment', 'professional', 'career', 'job'],
+        'skills': ['skills', 'technical', 'competencies', 'technologies', 'programming', 'languages'],
+        'education': ['education', 'academic', 'degree', 'university', 'college', 'school', 'qualification'],
+        'projects': ['projects', 'project', 'portfolio', 'work samples']
+    }
     
-    return existing_projects
+    keywords = section_keywords.get(section_type.lower(), [section_type.lower()])
+    
+    for line in lines:
+        line_lower = line.lower().strip()
+        
+        # Check if this line is a section header
+        is_section_header = any(keyword in line_lower for keyword in keywords) and (
+            line.isupper() or 
+            len(line.strip()) < 50 or
+            line.strip().endswith(':')
+        )
+        
+        if is_section_header:
+            in_section = True
+            section_lines.append(line)
+            continue
+        
+        # Check if we've moved to a different section
+        if in_section and line.isupper() and len(line.strip()) > 3:
+            # Check if this is a different section header
+            other_section = any(
+                any(kw in line_lower for kw in kws) 
+                for sect, kws in section_keywords.items() 
+                if sect != section_type.lower()
+            )
+            if other_section:
+                break
+        
+        if in_section and line.strip():
+            section_lines.append(line)
+    
+    return '\n'.join(section_lines) if section_lines else ""
 
 def parse_cv_sections(cv_content: str) -> dict:
     """Parse CV content to identify sections and their positions"""
@@ -1078,18 +1167,8 @@ async def upload_cv(file: UploadFile = File(...)):
             # Generate a title from filename
             title = file.filename.replace('.pdf', '').replace('.docx', '').replace('.txt', '').replace('_', ' ').title()
             
-            # Extract projects from uploaded CV and store them
-            try:
-                existing_projects = extract_projects_from_cv(cv_text)
-                for project in existing_projects:
-                    # Check if project already exists to avoid duplicates
-                    cursor.execute("SELECT COUNT(*) FROM manual_projects WHERE project_data LIKE ?", 
-                                 (f'%{project.get("title", "")}%',))
-                    if cursor.fetchone()[0] == 0:
-                        cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
-                                     (json.dumps(project),))
-            except Exception as e:
-                print(f"Error extracting projects from uploaded CV: {e}")
+            # Clear all existing projects when new CV is uploaded
+            cursor.execute("DELETE FROM manual_projects")
             
             # Set all other CVs as inactive
             cursor.execute("UPDATE cvs SET is_active = FALSE")
@@ -1100,7 +1179,7 @@ async def upload_cv(file: UploadFile = File(...)):
                           (title, file.filename, cv_text, cv_text))
         
         return JSONResponse(status_code=200, content={
-            "message": "CV uploaded successfully! Projects automatically extracted and ready for enhancement.", 
+            "message": "CV uploaded successfully! You can now add projects manually in the Projects section.", 
             "filename": file.filename,
             "title": title
         })
@@ -1114,13 +1193,68 @@ async def chat(request: ChatRequest):
             cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
                           (request.message, "user"))
         
-            classification = classify_message(request.message)
+            # Get current CV content for context
+            cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            cv_content = cv_row[0] if cv_row else None
+            
+            classification = classify_message(request.message, cv_content)
             category = classification.get("category", "OTHER")
             extracted_info = classification.get("extracted_info")
+            cv_response = classification.get("cv_response")
             
             response_text = ""
             
-            if category == "CV_REQUEST":
+            if category == "CV_QUESTION":
+                # Handle CV content questions intelligently based on ACTUAL CV content
+                if cv_content:
+                    if cv_response == "experience":
+                        experience_section = extract_section_from_cv(cv_content, 'experience')
+                        if experience_section:
+                            response_text = f"📝 **Your Work Experience (from your CV):**\n\n{experience_section}"
+                        else:
+                            response_text = "📋 I don't see any work experience in your CV yet. Would you like to add some? Just tell me about your jobs!"
+                    elif cv_response == "skills":
+                        skills_section = extract_section_from_cv(cv_content, 'skills')
+                        if skills_section:
+                            response_text = f"🛠️ **Your Skills (from your CV):**\n\n{skills_section}"
+                        else:
+                            response_text = "🎯 I don't see any skills listed in your CV yet. Tell me what skills you have and I'll add them!"
+                    elif cv_response == "education":
+                        education_section = extract_section_from_cv(cv_content, 'education')
+                        if education_section:
+                            response_text = f"🎓 **Your Education (from your CV):**\n\n{education_section}"
+                        else:
+                            response_text = "📚 I don't see any education information in your CV yet. Tell me about your degrees and I'll add them!"
+                    elif cv_response == "projects":
+                        # Get actual projects from database
+                        cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
+                        projects = cursor.fetchall()
+                        if projects:
+                            response_text = f"🚀 **Your Projects (from database):**\n\n"
+                            for i, (project_json,) in enumerate(projects[:3], 1):
+                                try:
+                                    project = json.loads(project_json)
+                                    response_text += f"{i}. **{project.get('title', 'Untitled')}**\n   Technologies: {', '.join(project.get('technologies', []))}\n\n"
+                                except:
+                                    pass
+                        else:
+                            response_text = "📭 No projects found. You can add projects using the 'Add project' button!"
+                    else:
+                        # Show actual CV sections summary
+                        sections = parse_cv_sections(cv_content)
+                        if sections:
+                            response_text = f"📋 **Your CV Summary (actual content):**\n\n"
+                            for section_name in ['skills', 'experience', 'education']:
+                                section_content = extract_section_from_cv(cv_content, section_name)
+                                if section_content:
+                                    response_text += f"**{section_name.upper()}:**\n{section_content[:200]}...\n\n"
+                        else:
+                            response_text = f"📋 **Your CV Content:**\n\n{cv_content[:500]}..."
+                else:
+                    response_text = "📄 Please upload a CV first so I can answer questions about your background!"
+                    
+            elif category == "CV_REQUEST":
                 # Generate CV with projects using existing cursor
                 updated_cv = generate_cv_with_projects(cursor, conn)
                 response_text = "✅ Generated your enhanced CV with all projects included! Check the CV panel."
@@ -1167,10 +1301,36 @@ async def chat(request: ChatRequest):
                 response_text = "🔧 To modify a project, please specify the project ID and what you want to change. For example: 'Update project 1 - change title to Mobile App'"
                 
             elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE"]:
-                update_type = category.replace("_UPDATE", "").lower()
-                cursor.execute("INSERT INTO cv_updates (update_type, content, original_message, processed) VALUES (?, ?, ?, ?)", 
-                             (update_type, extracted_info, request.message, False))
-                response_text = f"💡 Saved your {update_type}! Say 'generate CV' when ready to create updated CV."
+                # Get current CV content
+                cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+                cv_row = cursor.fetchone()
+                
+                if cv_row:
+                    current_cv = cv_row[0]
+                    
+                    # Map category to section name
+                    section_mapping = {
+                        "SKILL_UPDATE": "skills",
+                        "EXPERIENCE_UPDATE": "experience", 
+                        "EDUCATION_UPDATE": "education"
+                    }
+                    
+                    target_section = section_mapping.get(category, "skills")
+                    
+                    # Update the specific section using OpenAI
+                    updated_cv = update_cv_section_smart(current_cv, target_section, extracted_info)
+                    
+                    # Save the updated CV
+                    cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                    
+                    update_type = category.replace("_UPDATE", "").lower()
+                    response_text = f"✅ Updated your {update_type} section successfully! The CV has been automatically updated."
+                else:
+                    # Fallback to old method if no CV found
+                    update_type = category.replace("_UPDATE", "").lower()
+                    cursor.execute("INSERT INTO cv_updates (update_type, content, original_message, processed) VALUES (?, ?, ?, ?)", 
+                                 (update_type, extracted_info, request.message, False))
+                    response_text = f"💡 Saved your {update_type}! Say 'generate CV' when ready to create updated CV."
                 
             elif category == "CV_CLEANUP":
                 response_text = "🧹 Cleaning up duplicate sections in your CV. This might take a moment..."
@@ -1197,6 +1357,11 @@ async def chat(request: ChatRequest):
     • "I learned Python" - Add skills
     • "I worked at..." - Add experience
     • "I got certified in..." - Add education
+    
+    ❓ **CV Questions:**
+    • "What experience do I have?" - Show work history
+    • "What skills do I have?" - Show skills
+    • "What projects have I built?" - Show projects
 
     Just tell me what you want to add or update! 😊"""
         
@@ -1211,7 +1376,7 @@ async def chat(request: ChatRequest):
 async def get_current_cv():
     try:
         with get_db_cursor() as (cursor, conn):
-            # Get the active CV
+            # Get the active CV with current content (includes all updates)
             cursor.execute("SELECT filename, current_content, updated_at FROM cvs WHERE is_active = TRUE LIMIT 1")
             cv_row = cursor.fetchone()
             
@@ -1225,27 +1390,51 @@ async def get_current_cv():
             
             filename, current_content, updated_at = cv_row
             
-            cursor.execute("SELECT update_type, content FROM cv_updates WHERE processed = FALSE ORDER BY created_at")
-            updates = cursor.fetchall()
-            
-            if updates:
-                updated_cv = enhance_cv_with_openai(current_content, updates)
-                cursor.execute("UPDATE cv_updates SET processed = TRUE")
-                cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-            else:
-                updated_cv = current_content
-            
-            # Ensure CV is regenerated with current projects only (removes deleted projects)
-            updated_cv = generate_cv_with_projects(cursor, conn)
-            
-            # Format with AI for better presentation
-            formatted_cv = format_cv_with_ai(updated_cv)
-            
-            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (formatted_cv,))
+            # Format the current CV for better display (this includes all updates)
+            formatted_cv = format_cv_for_display(current_content)
             
             return CVResponse(content=formatted_cv, filename=filename, last_updated=updated_at)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+def format_cv_for_display(cv_content: str) -> str:
+    """Format CV content for clean display in the frontend"""
+    try:
+        lines = cv_content.strip().split('\n')
+        formatted_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                formatted_lines.append("")
+                continue
+            
+            # Check if this is a section header (all caps or contains common section keywords)
+            is_header = (
+                line.isupper() and len(line) > 3 or
+                any(keyword in line.upper() for keyword in 
+                    ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 
+                     'PROJECTS', 'ACHIEVEMENTS', 'CERTIFICATIONS', 'CONTACT'])
+            )
+            
+            if is_header:
+                # Add some spacing before section headers
+                if formatted_lines and formatted_lines[-1] != "":
+                    formatted_lines.append("")
+                formatted_lines.append(f"📋 {line}")
+                formatted_lines.append("─" * (len(line) + 5))  # Add underline
+            else:
+                # Clean up bullet points and formatting
+                if line.startswith('•') or line.startswith('-') or line.startswith('*'):
+                    formatted_lines.append(f"  • {line[1:].strip()}")
+                else:
+                    formatted_lines.append(line)
+        
+        return '\n'.join(formatted_lines)
+        
+    except Exception as e:
+        print(f"Error formatting CV for display: {e}")
+        return cv_content  # Return original if formatting fails
 
 # New CV Management Endpoints
 @app.get("/cvs/")
@@ -1423,27 +1612,40 @@ async def download_cv_by_id(cv_id: int):
         pdf_buffer = generate_cv_pdf(formatted_content, [])
         pdf_content = pdf_buffer.getvalue()
         
-        # Generate filename from title
+        # Generate filename from title and determine file type
         safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{safe_title}_{timestamp}.pdf"
+        
+        # Determine file type based on content
+        try:
+            # Try to decode as text to see if it's a text file
+            pdf_content.decode('utf-8')
+            # If successful, it's a text file
+            filename = f"{safe_title}_{timestamp}.txt"
+            media_type = "text/plain"
+            content_type = "text/plain; charset=utf-8"
+        except UnicodeDecodeError:
+            # If decode fails, it's binary PDF content
+            filename = f"{safe_title}_{timestamp}.pdf"
+            media_type = "application/pdf"
+            content_type = "application/pdf"
         
         return Response(
             content=pdf_content,
-            media_type="application/pdf",
+            media_type=media_type,
             headers={
                 "Content-Disposition": f"attachment; filename=\"{filename}\"",
                 "Content-Length": str(len(pdf_content)),
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
                 "Expires": "0",
-                "Content-Type": "application/pdf",
+                "Content-Type": content_type,
                 "X-Content-Type-Options": "nosniff"
             }
         )
         
     except Exception as e:
-        print(f"Error generating CV PDF: {str(e)}")
+        print(f"Error generating CV document: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error downloading CV: {str(e)}")
 
 @app.get("/chat/history/")
@@ -1554,6 +1756,16 @@ async def delete_project(project_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
+@app.delete("/projects/clear-all")
+async def clear_all_projects():
+    """Clear all projects from the database"""
+    try:
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("DELETE FROM manual_projects")
+            return {"message": "All projects cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
 @app.get("/projects/list")
 async def list_projects_with_ids():
     try:
@@ -1617,6 +1829,48 @@ async def generate_updated_cv():
         with get_db_cursor() as (cursor, conn):
             updated_cv = generate_cv_with_projects(cursor, conn)
             return {"message": "CV generated successfully", "cv_content": updated_cv}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.get("/cv/enhanced/", response_model=CVResponse)
+async def get_enhanced_cv():
+    """Get CV with all enhancements and projects included"""
+    try:
+        with get_db_cursor() as (cursor, conn):
+            # Get the active CV
+            cursor.execute("SELECT filename, current_content, updated_at FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                # If no active CV, get the most recent one
+                cursor.execute("SELECT filename, current_content, updated_at FROM cvs ORDER BY updated_at DESC LIMIT 1")
+                cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+            
+            filename, current_content, updated_at = cv_row
+            
+            # Apply any pending updates
+            cursor.execute("SELECT update_type, content FROM cv_updates WHERE processed = FALSE ORDER BY created_at")
+            updates = cursor.fetchall()
+            
+            if updates:
+                enhanced_cv = enhance_cv_with_openai(current_content, updates)
+                cursor.execute("UPDATE cv_updates SET processed = TRUE")
+                cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (enhanced_cv,))
+            else:
+                enhanced_cv = current_content
+            
+            # Generate CV with all projects and enhancements
+            enhanced_cv = generate_cv_with_projects(cursor, conn)
+            
+            # Format with AI for better presentation
+            formatted_cv = format_cv_with_ai(enhanced_cv)
+            
+            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (formatted_cv,))
+            
+            return CVResponse(content=formatted_cv, filename=filename, last_updated=updated_at)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -1993,305 +2247,246 @@ Return only the formatted CV content, no additional commentary."""
         return cv_content  # Return original if AI fails
 
 def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
-    """Generate a modern, professional PDF CV with all projects"""
+    """Generate a professional PDF using ReportLab or formatted text as fallback"""
     buffer = BytesIO()
     
+    # Try ReportLab PDF generation first
     try:
-        # Create custom page template with margins
-        doc = SimpleDocTemplate(
-            buffer, 
-            pagesize=A4,
-            rightMargin=40,
-            leftMargin=40,
-            topMargin=40,
-            bottomMargin=40
-        )
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+        from reportlab.lib.colors import HexColor, black, darkblue
+        from reportlab.lib.units import inch
         
-        # Create custom styles
+        # Create PDF document
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                              rightMargin=72, leftMargin=72,
+                              topMargin=72, bottomMargin=18)
+        
+        # Get default styles and create custom ones
         styles = getSampleStyleSheet()
         
-        # Custom header style
-        header_style = ParagraphStyle(
-            'CustomHeader',
+        # Custom styles for professional CV
+        title_style = ParagraphStyle(
+            'CustomTitle',
             parent=styles['Heading1'],
             fontSize=24,
-            spaceAfter=20,
+            spaceAfter=30,
             alignment=TA_CENTER,
-            textColor=HexColor('#2C3E50'),
+            textColor=darkblue,
             fontName='Helvetica-Bold'
         )
         
-        # Custom section header style
-        section_style = ParagraphStyle(
-            'SectionHeader',
+        heading_style = ParagraphStyle(
+            'CustomHeading',
             parent=styles['Heading2'],
-            fontSize=16,
-            spaceAfter=10,
-            spaceBefore=15,
-            textColor=HexColor('#34495E'),
+            fontSize=14,
+            spaceAfter=12,
+            spaceBefore=20,
+            textColor=darkblue,
             fontName='Helvetica-Bold',
             borderWidth=1,
-            borderColor=HexColor('#3498DB'),
-            borderPadding=5,
-            backColor=HexColor('#ECF0F1')
+            borderColor=darkblue,
+            borderPadding=5
         )
         
-        # Custom content style
-        content_style = ParagraphStyle(
-            'Content',
+        body_style = ParagraphStyle(
+            'CustomBody',
             parent=styles['Normal'],
-            fontSize=11,
-            spaceAfter=6,
-            leftIndent=10,
+            fontSize=10,
+            spaceAfter=8,
+            alignment=TA_JUSTIFY,
             fontName='Helvetica'
         )
         
-        # Custom project title style
-        project_title_style = ParagraphStyle(
-            'ProjectTitle',
-            parent=styles['Normal'],
-            fontSize=13,
-            spaceAfter=4,
-            spaceBefore=8,
-            textColor=HexColor('#2980B9'),
-            fontName='Helvetica-Bold'
-        )
-        
-        # Custom tech style
-        tech_style = ParagraphStyle(
-            'TechStyle',
+        bullet_style = ParagraphStyle(
+            'CustomBullet',
             parent=styles['Normal'],
             fontSize=10,
             spaceAfter=4,
-            textColor=HexColor('#7F8C8D'),
-            fontName='Helvetica-Oblique'
+            leftIndent=20,
+            fontName='Helvetica'
         )
         
+        # Build PDF content
         story = []
         
-        # Extract name from CV for header
-        cv_lines = cv_content.strip().split('\n')
-        name = "Professional CV"
-        for line in cv_lines[:5]:  # Check first 5 lines for name
-            if line.strip() and not any(keyword.lower() in line.lower() for keyword in 
-                ['phone', 'email', 'address', 'cv', 'curriculum', 'vitae', 'resume']):
-                name = line.strip()
-                break
+        # Title
+        story.append(Paragraph("PROFESSIONAL CURRICULUM VITAE", title_style))
+        story.append(Spacer(1, 20))
         
-        # Add professional header
-        story.append(Paragraph(name, header_style))
-        story.append(Spacer(1, 10))
+        # Process CV content
+        lines = cv_content.split('\n')
+        current_section = ""
         
-        # Parse CV content into sections
-        current_section = None
-        section_content = []
-        sections = {}
-        
-        for line in cv_lines:
+        for line in lines:
             line = line.strip()
             if not line:
+                story.append(Spacer(1, 6))
                 continue
                 
-            # Check if this is a section header
-            is_section_header = (
-                line.isupper() or 
-                any(keyword in line.upper() for keyword in 
-                    ['PERSONAL', 'PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 
-                     'EDUCATION', 'PROJECTS', 'ACHIEVEMENTS', 'CERTIFICATIONS', 'CONTACT'])
-            )
-            
-            if is_section_header:
-                # Save previous section
-                if current_section and section_content:
-                    sections[current_section] = section_content
-                
-                # Start new section
+            # Check if line is a section header
+            if (line.isupper() and len(line) > 3) or any(keyword in line.upper() for keyword in 
+                ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS']):
+                # Section header
+                story.append(Paragraph(line, heading_style))
                 current_section = line
-                section_content = []
+            elif line.startswith('•') or line.startswith('-') or line.startswith('*'):
+                # Bullet point
+                clean_line = line[1:].strip()
+                story.append(Paragraph(f"• {clean_line}", bullet_style))
+            elif line.startswith('📋') or '─' in line:
+                # Skip formatting artifacts
+                continue
             else:
-                if current_section:
-                    section_content.append(line)
+                # Regular content
+                story.append(Paragraph(line, body_style))
         
-        # Save last section
-        if current_section and section_content:
-            sections[current_section] = section_content
-        
-        # Add sections in logical order
-        section_order = ['PERSONAL INFORMATION', 'CONTACT INFORMATION', 'CONTACT', 'PROFILE', 
-                        'SUMMARY', 'PROFESSIONAL SUMMARY', 'SKILLS', 'TECHNICAL SKILLS', 
-                        'EXPERIENCE', 'WORK EXPERIENCE', 'PROFESSIONAL EXPERIENCE', 
-                        'EDUCATION', 'CERTIFICATIONS', 'ACHIEVEMENTS', 'PROJECTS']
-        
-        # Add sections that exist in the CV
-        added_sections = set()
-        for section_name in section_order:
-            for cv_section, content in sections.items():
-                if (section_name.lower() in cv_section.lower() and 
-                    cv_section not in added_sections and 
-                    not cv_section.upper().startswith('ADDITIONAL')):  # Skip ADDITIONAL sections
-                    story.append(Paragraph(cv_section, section_style))
-                    
-                    for item in content:
-                        if item.strip():
-                            # Clean up formatting
-                            clean_item = item.replace('•', '').replace('-', '').strip()
-                            if clean_item:
-                                story.append(Paragraph(f"• {clean_item}", content_style))
-                    
-                    story.append(Spacer(1, 8))
-                    added_sections.add(cv_section)
-                    break
-        
-        # Add any remaining sections (but skip ADDITIONAL sections)
-        for cv_section, content in sections.items():
-            if (cv_section not in added_sections and 
-                not cv_section.upper().startswith('ADDITIONAL')):  # Skip ADDITIONAL sections
-                story.append(Paragraph(cv_section, section_style))
-                
-                for item in content:
-                    if item.strip():
-                        clean_item = item.replace('•', '').replace('-', '').strip()
-                        if clean_item:
-                            story.append(Paragraph(f"• {clean_item}", content_style))
-                
-                story.append(Spacer(1, 8))
-        
-        # Add projects section if we have manual projects
-        if projects:
-            # Note: Projects are already integrated into the CV content, but we can enhance the PDF display
-            # Don't add "ADDITIONAL PROJECTS" - projects are already part of the main content
-            pass
-        
-        # Add professional footer
-        story.append(Spacer(1, 20))
+        # Add footer
+        story.append(Spacer(1, 30))
         footer_style = ParagraphStyle(
             'Footer',
             parent=styles['Normal'],
-            fontSize=9,
+            fontSize=8,
             alignment=TA_CENTER,
-            textColor=HexColor('#7F8C8D'),
-            fontName='Helvetica-Oblique'
+            textColor=HexColor('#666666')
         )
         
-        timestamp = datetime.now().strftime("%B %d, %Y")
-        story.append(Paragraph(f"Generated on {timestamp} | CV Updater Platform", footer_style))
+        footer_text = f"Generated on {datetime.now().strftime('%B %d, %Y')} | CV Updater Platform"
+        story.append(Paragraph(footer_text, footer_style))
         
         # Build PDF
         doc.build(story)
         buffer.seek(0)
-        print("Modern PDF CV generated successfully")
+        print("✅ Professional PDF generated successfully with ReportLab")
         return buffer
         
+    except ImportError:
+        print("ReportLab not available, using text fallback")
+        return generate_cv_text_fallback(cv_content, buffer)
     except Exception as e:
-        print(f"PDF generation error: {e}")
-        # Fallback to basic PDF
+        print(f"ReportLab PDF generation failed: {e}, using text fallback")
+        return generate_cv_text_fallback(cv_content, buffer)
+
+def generate_cv_text_fallback(cv_content: str, buffer: BytesIO) -> BytesIO:
+    """Generate formatted text file as PDF fallback"""
+    try:
+        # Format CV content for better readability
+        formatted_content = f"""
+PROFESSIONAL CURRICULUM VITAE
+{'='*60}
+
+{cv_content}
+
+{'='*60}
+Generated on {datetime.now().strftime('%B %d, %Y')} | CV Updater Platform
+        """
+        
+        # Save as text content
+        buffer.write(formatted_content.encode('utf-8'))
+        buffer.seek(0)
+        print("✅ CV text document generated successfully (PDF fallback)")
+        return buffer
+            
+    except Exception as e:
+        print(f"CV generation error: {e}")
+        # Minimal fallback
         try:
             buffer = BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=A4)
-            styles = getSampleStyleSheet()
-            story = []
-            
-            story.append(Paragraph("CURRICULUM VITAE", styles['Title']))
-            story.append(Spacer(1, 20))
-            
-            # Add CV content with basic formatting
-            lines = cv_content.strip().split('\n')
-            for line in lines:
-                if line.strip():
-                    if line.isupper():
-                        story.append(Paragraph(f"<b>{line}</b>", styles['Heading2']))
-                    else:
-                        story.append(Paragraph(line, styles['Normal']))
-            
-            # Add projects
-            if projects:
-                story.append(Spacer(1, 15))
-                story.append(Paragraph("<b>PROJECTS</b>", styles['Heading2']))
-                for project in projects:
-                    story.append(Paragraph(f"<b>{project.get('title', 'Project')}</b>", styles['Normal']))
-                    if project.get('description'):
-                        story.append(Paragraph(project['description'], styles['Normal']))
-            
-            doc.build(story)
+            simple_content = f"CURRICULUM VITAE\n\n{cv_content}\n\nGenerated on {datetime.now().strftime('%B %d, %Y')}"
+            buffer.write(simple_content.encode('utf-8'))
             buffer.seek(0)
-            print("Basic fallback PDF generated")
             return buffer
-            
         except Exception as fallback_error:
-            print(f"Fallback PDF generation failed: {fallback_error}")
-            # Create minimal valid PDF
-            buffer = BytesIO()
-            buffer.write(b'%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000010 00000 n \n0000000053 00000 n \n0000000125 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n196\n%%EOF')
-            buffer.seek(0)
-            return buffer
+            print(f"Fallback CV generation failed: {fallback_error}")
+            raise HTTPException(status_code=500, detail="Could not generate CV document. Please try again.")
 
 @app.post("/cv/download")
 async def download_cv():
     try:
         # Generate updated CV with all projects and pending updates
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # Get current CV content
-        cursor.execute("SELECT current_content FROM cvs LIMIT 1")
-        cv_row = cursor.fetchone()
-        
-        if not cv_row:
-            raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
-        
-        current_cv = cv_row[0]
-        
-        # Check for pending updates
-        cursor.execute("SELECT update_type, content FROM cv_updates WHERE processed = FALSE ORDER BY created_at")
-        updates = cursor.fetchall()
-        
-        if updates:
-            # Apply pending updates
-            updated_cv = enhance_cv_with_openai(current_cv, updates)
-            # Mark updates as processed
-            cursor.execute("UPDATE cv_updates SET processed = TRUE")
-            # Update CV in database
-            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (updated_cv,))
-        else:
-            updated_cv = current_cv
-        
-        # Regenerate CV with current projects to ensure everything is up to date
-        updated_cv = generate_cv_with_projects()
-        
-        # Format CV with AI for better structure
-        formatted_cv = format_cv_with_ai(updated_cv)
-        
-        # Update the database with the clean CV
-        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (formatted_cv,))
-        
-        conn.commit()
-        conn.close()
-        
-        # Generate PDF file - don't pass projects since they're already in CV content
-        pdf_buffer = generate_cv_pdf(formatted_cv, [])  # Empty list prevents duplication
-        pdf_content = pdf_buffer.getvalue()
-        
-        # Generate a proper filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"Professional_CV_{timestamp}.pdf"
-        
-        return Response(
-            content=pdf_content,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename=\"{filename}\"",
-                "Content-Length": str(len(pdf_content)),
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
-                "Content-Type": "application/pdf",
-                "X-Content-Type-Options": "nosniff"
-            }
-        )
+        with get_db_cursor() as (cursor, conn):
+            # Get current CV content
+            cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                # If no active CV, get the most recent one
+                cursor.execute("SELECT current_content FROM cvs ORDER BY updated_at DESC LIMIT 1")
+                cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+            
+            current_cv = cv_row[0]
+            
+            # Check for pending updates and apply them
+            cursor.execute("SELECT update_type, content FROM cv_updates WHERE processed = FALSE ORDER BY created_at")
+            updates = cursor.fetchall()
+            
+            if updates:
+                # Apply pending updates
+                updated_cv = enhance_cv_with_openai(current_cv, updates)
+                # Mark updates as processed
+                cursor.execute("UPDATE cv_updates SET processed = TRUE")
+                # Update CV in database
+                cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                current_cv = updated_cv
+            
+            # Regenerate CV with current projects to ensure everything is up to date
+            final_cv = generate_cv_with_projects(cursor, conn)
+            
+            # Ensure we have the most complete CV content
+            if len(final_cv) > len(current_cv):
+                current_cv = final_cv
+            
+            # Format CV with AI for better structure
+            formatted_cv = format_cv_with_ai(current_cv)
+            
+            # Update the database with the final CV
+            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (formatted_cv,))
+            
+            # Generate comprehensive PDF file with all content
+            pdf_buffer = generate_cv_pdf(formatted_cv, [])
+            pdf_content = pdf_buffer.getvalue()
+            
+            # Determine file type and media type based on content
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            # Check if we generated an actual PDF (binary content) or text fallback
+            try:
+                # Try to decode as text to see if it's a text file
+                pdf_content.decode('utf-8')
+                # If successful, it's a text file
+                filename = f"Enhanced_CV_Complete_{timestamp}.txt"
+                media_type = "text/plain"
+                content_type = "text/plain; charset=utf-8"
+                print("📄 Serving complete CV as text file")
+            except UnicodeDecodeError:
+                # If decode fails, it's binary PDF content
+                filename = f"Enhanced_CV_Complete_{timestamp}.pdf"
+                media_type = "application/pdf"
+                content_type = "application/pdf"
+                print("📄 Serving complete CV as PDF file")
+            
+            return Response(
+                content=pdf_content,
+                media_type=media_type,
+                headers={
+                    "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                    "Content-Length": str(len(pdf_content)),
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                    "Content-Type": content_type,
+                    "X-Content-Type-Options": "nosniff"
+                }
+            )
         
     except Exception as e:
-        print(f"Error generating CV PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error downloading CV: {str(e)}")
+        print(f"Error generating complete CV document: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error downloading complete CV: {str(e)}")
 
 # Vercel handler - add this at the end of the file
 handler = app
