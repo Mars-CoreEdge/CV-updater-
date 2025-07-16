@@ -1,0 +1,7 @@
+JOHN DOE
+Software Developer
+
+Contact Information:
+Email: john.doe@email.com
+Phone: (555) 123-4567
+Location: New York, NY
