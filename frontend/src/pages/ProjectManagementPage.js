@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -665,11 +665,11 @@ function ProjectManagementPage() {
       
       // More specific error messages
       if (error.response?.status === 404) {
-        addChatMessage("❌ Backend server not found. Please make sure the backend is running on http://localhost:8000");
+        addChatMessage("❌ Backend server not found. Please make sure the backend is running on http://localhost:8081");
       } else if (error.response?.status >= 500) {
         addChatMessage("❌ Server error occurred. Check the backend console for details.");
       } else if (error.code === 'ECONNREFUSED') {
-        addChatMessage("❌ Cannot connect to backend server. Please ensure it's running on http://localhost:8000");
+        addChatMessage("❌ Cannot connect to backend server. Please ensure it's running on http://localhost:8081");
       } else {
         addChatMessage("❌ Error creating project. Please try again or use the manual form. Check console for details.");
       }

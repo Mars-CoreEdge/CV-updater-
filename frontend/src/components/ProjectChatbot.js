@@ -421,7 +421,7 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
 
   const handleDownloadCV = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/cv/download', {}, {
+      const response = await axios.post('http://localhost:8081/cv/download', {}, {
         responseType: 'blob'
       });
       
@@ -578,7 +578,7 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
 
   const handleGenerateBlog = async (projectName) => {
     try {
-      const response = await axios.post('http://localhost:8000/blog/generate', {
+      const response = await axios.post('http://localhost:8081/blog/generate', {
         project_title: projectName
       });
       
@@ -618,7 +618,7 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
       case 'cleanup_cv':
         simulateTyping(1500);
         setTimeout(async () => {
-          const result = await axios.post('http://localhost:8000/cv/cleanup');
+          const result = await axios.post('http://localhost:8081/cv/cleanup');
           if (result.data.success) {
             addMessage("✅ Your CV has been cleaned up and updated!");
           } else {
@@ -678,7 +678,7 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
               const projectData = await extractProjectFromMessage(message);
               
               if (projectData) {
-                const response = await axios.post('http://localhost:8000/projects/create', projectData);
+                const response = await axios.post('http://localhost:8081/projects/create', projectData);
                 
                 if (response.data && response.data.message === "Project created successfully") {
                   // Reload projects to get fresh data with IDs
@@ -739,7 +739,7 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
               // Check if project has an ID (can be deleted from backend)
               if (deletedProject.id) {
                 try {
-                  await axios.delete(`http://localhost:8000/projects/${deletedProject.id}`);
+                  await axios.delete(`http://localhost:8081/projects/${deletedProject.id}`);
                   // Reload projects after successful deletion
                   if (onProjectsReload) {
                     await onProjectsReload();

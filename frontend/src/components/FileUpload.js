@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import * as pdfjsLib from 'pdfjs-dist';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
 // Configure PDF.js worker - Use a reliable CDN version that's known to work
 try {
@@ -366,22 +366,43 @@ function FileUpload({ onFileUploaded }) {
     setError(null);
 
     try {
-      // Step 1: Extract content from file
+      // Step 1: Extract content from file (if possible)
       setUploadStatus('Reading file content...');
       const fileContent = await readFileContent(selectedFile);
       
-      console.log('Extracted file content length:', fileContent.length);
-      console.log('Content preview:', fileContent.substring(0, 500));
-
-      if (!fileContent || fileContent.trim().length === 0) {
-        throw new Error('Could not extract content from file');
-      }
-
       // Step 2: Upload CV to backend API
       setUploadStatus('Uploading CV to server...');
       
       const formData = new FormData();
       formData.append('file', selectedFile);
+      
+      // Only add extracted_text if we have it (for text files)
+      if (fileContent) {
+        console.log('Extracted file content length:', fileContent.length);
+        console.log('Content preview:', fileContent.substring(0, 500));
+        formData.append('extracted_text', fileContent);
+        
+        // --- Education section regex extraction ---
+        // This regex matches a wide variety of education section headers (robust, case-insensitive, underscores/dashes/spaces)
+        const educationRegex = /^(?:[_\-\s]*)(EDUCATION|EDUCATIONAL\s+BACKGROUND|EDUCATION\s+&\s+QUALIFICATIONS|ACADEMIC\s+BACKGROUND|QUALIFICATIONS)[_\-\s]*$\n*([\s\S]*?)(?=^[_\-\s]*[A-Z][A-Z\s&]+[_\-\s]*$|$)/im;
+        const educationMatch = fileContent.match(educationRegex);
+        let educationSection = null;
+        let educationIndices = null;
+        if (educationMatch) {
+          educationSection = educationMatch[0];
+          educationIndices = {
+            start: educationMatch.index,
+            end: educationMatch.index + educationMatch[0].length
+          };
+          console.log('[DIAG] Education section found:', educationSection);
+          console.log('[DIAG] Education section indices:', educationIndices);
+        } else {
+          console.log('[DIAG] No Education section found in extracted text.');
+        }
+        // --- End Education section regex extraction ---
+      } else {
+        console.log('No frontend extraction - backend will handle file processing');
+      }
 
       const response = await axios.post(`${API_BASE_URL}/upload-cv/`, formData, {
         headers: {
@@ -401,6 +422,8 @@ function FileUpload({ onFileUploaded }) {
       if (onFileUploaded) {
         onFileUploaded(true);
       }
+      // Dispatch a custom event to trigger CV refresh in other components
+      window.dispatchEvent(new CustomEvent('cv-updated', { detail: { reason: 'upload' } }));
       
       // Clear the file input
       setSelectedFile(null);
@@ -432,13 +455,13 @@ function FileUpload({ onFileUploaded }) {
           extractedText = await extractTextFromPDF(file);
         } catch (pdfError) {
           console.warn('Frontend PDF processing failed, will let backend handle it:', pdfError);
-          // Return a placeholder - the backend will process the PDF
-          extractedText = `PDF File: ${file.name}\n\nPDF file uploaded. The backend will extract the text content.`;
+          // Return null to indicate backend should handle extraction
+          return null;
         }
       } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         setUploadStatus('Processing Word document...');
-        // Handle .docx files
-        extractedText = `Word Document: ${file.name}\n\nWord document uploaded successfully. Please add your CV content through the chat interface.`;
+        // Return null to let backend handle DOCX processing
+        return null;
       } else if (file.type === 'text/plain') {
         setUploadStatus('Reading text file...');
         extractedText = await file.text();

@@ -723,7 +723,7 @@ function ProjectsPage() {
     
     try {
       // Use the endpoint that returns projects with IDs for deletion
-      const response = await axios.get('http://localhost:8000/projects/list');
+      const response = await axios.get('http://localhost:8081/projects/list');
       setProjects(response.data.projects || []);
     } catch (error) {
       setError(error.response?.data?.detail || 'Failed to load projects');
@@ -816,7 +816,7 @@ function ProjectsPage() {
         highlights: formData.highlights.filter(h => h.trim())
       };
       
-      const response = await axios.post('http://localhost:8000/projects/', projectData);
+      const response = await axios.post('http://localhost:8081/projects/', projectData);
       
       // Reload projects from backend to get fresh data with IDs
       await loadProjects();
@@ -853,7 +853,7 @@ function ProjectsPage() {
     
     if (projectToDelete && projectToDelete.id) {
       try {
-        await axios.delete(`http://localhost:8000/projects/${projectToDelete.id}`);
+        await axios.delete(`http://localhost:8081/projects/${projectToDelete.id}`);
         setProjects(prev => prev.filter((_, index) => index !== projectIndex));
       } catch (error) {
         console.error('Error deleting project:', error);
@@ -868,7 +868,7 @@ function ProjectsPage() {
 
   const handleDownloadCV = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/cv/download', {}, {
+      const response = await axios.post('http://localhost:8081/cv/download', {}, {
         responseType: 'blob'
       });
       

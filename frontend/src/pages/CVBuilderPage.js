@@ -1025,7 +1025,7 @@ function CVBuilderPage() {
     setIsSaving(true);
     try {
       // Send structured data to the backend
-      const response = await axios.post('http://localhost:8000/cv/create-from-builder', {
+      const response = await axios.post('http://localhost:8081/cv/create-from-builder', {
         personal_info: cvData.personalInfo,
         profile_summary: cvData.profileSummary,
         skills: cvData.skills,

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -9,9 +9,314 @@ from dotenv import load_dotenv
 import os
 import requests
 import re
+import psycopg2
+from fpdf import FPDF
+from io import BytesIO
+
+# Import database connection
+try:
+    from db import get_db_cursor
+    USE_SUPABASE = False  # Temporarily using SQLite
+    print("✅ Using SQLite database (temporary)")
+except ImportError:
+    print("❌ ERROR: db.py not found. Please ensure the database configuration file exists.")
+    raise ImportError("Database configuration file (db.py) is required")
+
+# Enhanced Section Detection Patterns
+SECTION_PATTERNS = {
+    "education": [
+        r"^[_\-=\s]*EDUCATION[_\-=\s]*$",
+        r"^[_\-=\s]*EDUCATIONAL\s+BACKGROUND[_\-=\s]*$",
+        r"^[_\-=\s]*EDUCATION\s+&\s+QUALIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*ACADEMIC\s+BACKGROUND[_\-=\s]*$",
+        r"^[_\-=\s]*QUALIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*ACADEMIC\s+QUALIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*EDUCATION\s+&\s+TRAINING[_\-=\s]*$"
+    ],
+    "experience": [
+        r"^[_\-=\s]*EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*WORK\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*EMPLOYMENT\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*WORK\s+HISTORY[_\-=\s]*$"
+    ],
+    "profile": [
+        r"^[_\-=\s]*PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFILE\s+SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$",
+        r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*OBJECTIVE[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+OBJECTIVE[_\-=\s]*$"
+    ],
+    "skills": [
+        r"^[_\-=\s]*SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
+        r"^[_\-=\s]*EXPERTISE[_\-=\s]*$"
+    ],
+    "projects": [
+        r"^[_\-=\s]*PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*PROJECT\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*KEY\s+PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*SELECTED\s+PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*PORTFOLIO[_\-=\s]*$"
+    ]
+}
 
 # Load .env from the backend directory
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), 'backend', '.env'))
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
+
+def find_section_in_cv(cv_content: str, section_name: str) -> dict:
+    """
+    Find a specific section in CV content using robust regex patterns.
+    Returns dict with start, end, content, and header info.
+    """
+    if section_name not in SECTION_PATTERNS:
+        return None
+    
+    lines = cv_content.split('\n')
+    patterns = SECTION_PATTERNS[section_name]
+    
+    for i, line in enumerate(lines):
+        line_upper = line.upper().strip()
+        for pattern in patterns:
+            if re.match(pattern, line_upper, re.IGNORECASE):
+                # Found the section header
+                start_line = i
+                header_line = line
+                
+                # Find the end of this section (next section or end of file)
+                end_line = len(lines)
+                for j in range(i + 1, len(lines)):
+                    # Check if this line is a header for another section
+                    for other_section, other_patterns in SECTION_PATTERNS.items():
+                        if other_section != section_name:
+                            for other_pattern in other_patterns:
+                                if re.match(other_pattern, lines[j].upper().strip(), re.IGNORECASE):
+                                    end_line = j
+                                    break
+                            if end_line != len(lines):
+                                break
+                    if end_line != len(lines):
+                        break
+                
+                # Extract section content
+                section_content = '\n'.join(lines[start_line:end_line])
+                
+                return {
+                    'start_line': start_line,
+                    'end_line': end_line,
+                    'start_pos': cv_content.find(line),
+                    'end_pos': cv_content.find('\n'.join(lines[:end_line])) + len('\n'.join(lines[:end_line])),
+                    'content': section_content,
+                    'header': header_line,
+                    'found': True
+                }
+    
+    return {'found': False}
+
+def insert_content_in_section_enhanced(cv_content: str, section_name: str, new_content: str, insert_mode: str = "append") -> str:
+    """
+    Insert content into a specific CV section with enhanced logic.
+    
+    Args:
+        cv_content: Full CV content
+        section_name: Name of section to update
+        new_content: Content to insert
+        insert_mode: "append", "prepend", or "replace"
+    
+    Returns:
+        Updated CV content
+    """
+    section_info = find_section_in_cv(cv_content, section_name)
+    lines = cv_content.split('\n')
+    
+    if section_info and section_info['found']:
+        # Section exists - insert content appropriately
+        start_line = section_info['start_line']
+        end_line = section_info['end_line']
+        
+        if insert_mode == "replace":
+            # Replace entire section content
+            new_section_lines = [lines[start_line]]  # Keep header
+            new_section_lines.extend(new_content.split('\n'))
+            lines = lines[:start_line] + new_section_lines + lines[end_line:]
+        elif insert_mode == "prepend":
+            # Add content at beginning of section (after header)
+            new_section_lines = [lines[start_line]]  # Keep header
+            new_section_lines.extend(new_content.split('\n'))
+            new_section_lines.extend(lines[start_line + 1:end_line])
+            lines = lines[:start_line] + new_section_lines + lines[end_line:]
+        else:  # append
+            # Add content at end of section
+            new_section_lines = lines[start_line:end_line]
+            new_section_lines.extend(new_content.split('\n'))
+            lines = lines[:start_line] + new_section_lines + lines[end_line:]
+    else:
+        # Section doesn't exist - create it
+        # Find a good position to insert (after profile/summary, before experience)
+        insert_position = len(lines)
+        
+        # Try to insert after profile/summary
+        profile_info = find_section_in_cv(cv_content, "profile")
+        if profile_info and profile_info['found']:
+            insert_position = profile_info['end_line']
+        else:
+            # Try to insert after first few lines (name, contact info)
+            for i in range(min(10, len(lines))):
+                if re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', lines[i].upper().strip()):
+                    insert_position = i
+                    break
+        
+        # Create section header
+        section_header = f"___________________________ {section_name.upper()} ___________________________"
+        new_section_lines = [section_header] + new_content.split('\n')
+        
+        lines = lines[:insert_position] + [''] + new_section_lines + lines[insert_position:]
+    
+    return '\n'.join(lines)
+
+def generate_enhanced_pdf(cv_content: str) -> BytesIO:
+    """
+    Generate a well-formatted PDF from CV content with enhanced styling.
+    """
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Set fonts (fallback to default if custom fonts not available)
+    try:
+        pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+        pdf.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf', uni=True)
+        use_custom_font = True
+    except:
+        use_custom_font = False
+    
+    # Parse CV content
+    lines = cv_content.split('\n')
+    
+    # Extract name and title (first few lines)
+    name = ""
+    title = ""
+    contact_info = []
+    
+    for i, line in enumerate(lines[:10]):
+        line = line.strip()
+        if line and not re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', line):
+            if not name:
+                name = line
+            elif not title and len(line) < 50:
+                title = line
+            elif '@' in line or re.match(r'^[\+]?[0-9\-\s\(\)]+$', line) or 'www.' in line:
+                contact_info.append(line)
+    
+    # Header section
+    if name:
+        if use_custom_font:
+            pdf.set_font('DejaVu', 'B', 20)
+        else:
+            pdf.set_font('Arial', 'B', 20)
+        pdf.cell(0, 10, name, ln=True, align='C')
+    
+    if title:
+        if use_custom_font:
+            pdf.set_font('DejaVu', '', 14)
+        else:
+            pdf.set_font('Arial', '', 14)
+        pdf.cell(0, 8, title, ln=True, align='C')
+    
+    # Contact info
+    if contact_info:
+        if use_custom_font:
+            pdf.set_font('DejaVu', '', 10)
+        else:
+            pdf.set_font('Arial', '', 10)
+        for contact in contact_info:
+            pdf.cell(0, 6, contact, ln=True, align='C')
+    
+    pdf.ln(10)
+    
+    # Process sections
+    current_section = None
+    section_content = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this is a section header
+        is_header = False
+        for section_name, patterns in SECTION_PATTERNS.items():
+            for pattern in patterns:
+                if re.match(pattern, line.upper(), re.IGNORECASE):
+                    # Process previous section
+                    if current_section and section_content:
+                        _write_section_to_pdf(pdf, current_section, section_content, use_custom_font)
+                    
+                    # Start new section
+                    current_section = section_name
+                    section_content = []
+                    is_header = True
+                    break
+            if is_header:
+                break
+        
+        if not is_header and current_section:
+            section_content.append(line)
+    
+    # Process last section
+    if current_section and section_content:
+        _write_section_to_pdf(pdf, current_section, section_content, use_custom_font)
+    
+    # Return PDF as bytes
+    pdf_bytes = BytesIO()
+    pdf.output(pdf_bytes, 'S')
+    pdf_bytes.seek(0)
+    return pdf_bytes
+
+def _write_section_to_pdf(pdf, section_name: str, content_lines: list, use_custom_font: bool = False):
+    """Helper function to write a section to PDF with proper formatting."""
+    # Section header
+    if use_custom_font:
+        pdf.set_font('DejaVu', 'B', 14)
+    else:
+        pdf.set_font('Arial', 'B', 14)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 8, section_name.upper(), ln=True, fill=True)
+    pdf.ln(2)
+    
+    # Section content
+    if use_custom_font:
+        pdf.set_font('DejaVu', '', 10)
+    else:
+        pdf.set_font('Arial', '', 10)
+    
+    for line in content_lines:
+        if line.strip():
+            # Check if this looks like a bullet point or subheading
+            if line.strip().startswith('•') or line.strip().startswith('-'):
+                pdf.cell(10, 6, '', ln=False)  # Indent
+                pdf.cell(0, 6, line.strip(), ln=True)
+            elif re.match(r'^[A-Z][A-Za-z\s]+:', line.strip()):
+                # Subheading (like "Company: ", "Duration: ")
+                if use_custom_font:
+                    pdf.set_font('DejaVu', 'B', 10)
+                else:
+                    pdf.set_font('Arial', 'B', 10)
+                pdf.cell(0, 6, line.strip(), ln=True)
+                if use_custom_font:
+                    pdf.set_font('DejaVu', '', 10)
+                else:
+                    pdf.set_font('Arial', '', 10)
+            else:
+                pdf.cell(0, 6, line.strip(), ln=True)
+    
+    pdf.ln(5)
 
 # Advanced PDF Processing Libraries
 try:
@@ -37,7 +342,6 @@ except ImportError:
     HAS_OCR = False
     print("OCR libraries not available")
 
-from io import BytesIO
 import json
 from typing import List, Optional
 import os
@@ -96,8 +400,57 @@ class CVResponse(BaseModel):
 
 # Database setup
 def init_db():
+    # SQLite setup (temporary)
+    try:
+        cursor, conn = get_db_cursor()
+        
+        # Create tables if they don't exist
+        cursor.execute('''CREATE TABLE IF NOT EXISTS cvs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL DEFAULT 'Untitled CV',
+            filename TEXT NOT NULL,
+            original_content TEXT NOT NULL,
+            current_content TEXT NOT NULL,
+            is_active BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
+        cursor.execute('''CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT NOT NULL,
+            message_type TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
+        cursor.execute('''CREATE TABLE IF NOT EXISTS cv_updates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            update_type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            original_message TEXT NOT NULL,
+            processed BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
+        cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✅ SQLite database initialized successfully")
+        
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        raise Exception(f"Failed to initialize database: {e}")
+
+def init_sqlite_db():
+    """Initialize SQLite database"""
     conn = sqlite3.connect('cv_updater.db', timeout=30.0)
-    conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
+    conn.execute("PRAGMA journal_mode=WAL")
     cursor = conn.cursor()
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS cvs (
@@ -165,6 +518,7 @@ def init_db():
     
     conn.commit()
     conn.close()
+    print("✅ SQLite database initialized successfully")
 
 init_db()
 
@@ -175,29 +529,15 @@ from contextlib import contextmanager
 # Global database lock
 db_lock = threading.RLock()
 
-def get_db_connection():
-    """Get database connection with proper timeout and error handling"""
-    try:
-        conn = sqlite3.connect('cv_updater.db', timeout=60.0, check_same_thread=False)
-        conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
-        conn.execute("PRAGMA synchronous=NORMAL")  # Better performance
-        conn.execute("PRAGMA cache_size=10000")   # Larger cache
-        conn.execute("PRAGMA temp_store=memory")  # Use memory for temp tables
-        return conn
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        raise
-
 @contextmanager
-def get_db_cursor():
+def get_db_cursor_context():
     """Context manager for database operations with automatic cleanup"""
     conn = None
     cursor = None
     try:
-        with db_lock:  # Use threading lock
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            yield cursor, conn
+        cursor, conn = get_db_cursor()
+        yield cursor, conn
+        if conn:
             conn.commit()
     except Exception as e:
         if conn:
@@ -409,89 +749,133 @@ Return JSON: {{"category": "CATEGORY", "extracted_info": "specific details", "ta
         return classify_message_fallback(message, cv_content)
 
 def classify_message_fallback(message: str, cv_content: str = None) -> dict:
-    """Enhanced fallback classification with full CRUD support"""
+    """Enhanced fallback classification with full CRUD support and better education detection"""
     msg = message.lower()
-    
+    print(f"[DEBUG] classify_message_fallback: message='{message}'")
+
+    # EDUCATION ADD/UPDATE - expanded patterns
+    education_add_phrases = [
+        "add", "include", "insert", "put", "append", "enroll", "study", "degree", "certification", "course", "program", "school", "university", "college", "phd", "master", "bachelor"
+    ]
+    if any(kw in msg for kw in education_add_phrases) and ("education" in msg or "degree" in msg or "phd" in msg or "master" in msg or "bachelor" in msg or "university" in msg or "college" in msg):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_ADD")
+        return {"category": "EDUCATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("education" in msg or "degree" in msg or "phd" in msg or "master" in msg or "bachelor" in msg or "university" in msg or "college" in msg):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_UPDATE")
+        return {"category": "EDUCATION_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+
     # READ OPERATIONS
     if any(phrase in msg for phrase in ["show cv", "display cv", "my cv", "current cv"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_SHOW")
         return {"category": "CV_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     elif any(phrase in msg for phrase in ["what skills", "my skills", "list skills", "show skills"]):
+        print("[DEBUG] classify_message_fallback: Detected SKILL_SHOW")
         return {"category": "SKILL_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     elif any(phrase in msg for phrase in ["what experience", "my jobs", "work history", "employment"]):
+        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_SHOW")
         return {"category": "EXPERIENCE_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     elif any(phrase in msg for phrase in ["my education", "degrees", "qualifications", "academic"]):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_SHOW")
         return {"category": "EDUCATION_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     elif any(phrase in msg for phrase in ["my projects", "what projects", "list projects", "portfolio"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_SHOW")
         return {"category": "PROJECT_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     elif any(phrase in msg for phrase in ["my contact", "contact details", "how to reach"]):
+        print("[DEBUG] classify_message_fallback: Detected CONTACT_SHOW")
         return {"category": "CONTACT_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     
     # DELETE OPERATIONS
     elif any(phrase in msg for phrase in ["remove skill", "delete skill", "don't have skill"]):
+        print("[DEBUG] classify_message_fallback: Detected SKILL_DELETE")
         return {"category": "SKILL_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
     elif any(phrase in msg for phrase in ["remove job", "delete experience", "wasn't employed"]):
+        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_DELETE")
         return {"category": "EXPERIENCE_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
     elif any(phrase in msg for phrase in ["remove degree", "delete education", "didn't study"]):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_DELETE")
         return {"category": "EDUCATION_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
     elif any(phrase in msg for phrase in ["remove project", "delete project", "didn't build"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_DELETE")
         return {"category": "PROJECT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
     elif any(phrase in msg for phrase in ["remove contact", "delete email", "no phone"]):
+        print("[DEBUG] classify_message_fallback: Detected CONTACT_DELETE")
         return {"category": "CONTACT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
     
     # UPDATE OPERATIONS
     elif any(phrase in msg for phrase in ["update skill", "change skill", "modify skill"]):
+        print("[DEBUG] classify_message_fallback: Detected SKILL_UPDATE")
         return {"category": "SKILL_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     elif any(phrase in msg for phrase in ["update job", "change experience", "modify work"]):
+        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_UPDATE")
         return {"category": "EXPERIENCE_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     elif any(phrase in msg for phrase in ["update degree", "change education", "modify qualification"]):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_UPDATE")
         return {"category": "EDUCATION_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     elif any(phrase in msg for phrase in ["update project", "change project", "modify project"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_UPDATE")
         return {"category": "PROJECT_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     elif any(phrase in msg for phrase in ["update contact", "change email", "new phone"]):
+        print("[DEBUG] classify_message_fallback: Detected CONTACT_UPDATE")
         return {"category": "CONTACT_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     
     # CREATE OPERATIONS
     elif any(phrase in msg for phrase in ["i learned", "i know", "add skill", "skilled in"]):
+        print("[DEBUG] classify_message_fallback: Detected SKILL_ADD")
         return {"category": "SKILL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["i worked", "i was employed", "job at", "worked as"]):
+        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_ADD")
         return {"category": "EXPERIENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["i studied", "graduated from", "degree in", "certification in"]):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_ADD")
         return {"category": "EDUCATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["i built", "i created", "i developed", "project called"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_ADD")
         return {"category": "PROJECT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["my email is", "phone number", "linkedin", "address"]):
+        print("[DEBUG] classify_message_fallback: Detected CONTACT_ADD")
         return {"category": "CONTACT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
     # UTILITY OPERATIONS - LinkedIn blog should be checked FIRST with more specific patterns
     elif any(phrase in msg for phrase in ["linkedin blog", "linkedin post", "generate linkedin", "create linkedin", "write linkedin"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
         return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["generate a linkedin", "create a linkedin", "write a linkedin", "generate linkedin post", "create linkedin post", "write linkedin post"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
         return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["generate blog", "create blog", "write blog"]) and not any(phrase in msg for phrase in ["contact", "email", "phone", "address"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
         return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["generate cv", "create cv", "make cv", "build cv"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_GENERATE")
         return {"category": "CV_GENERATE", "extracted_info": message.strip(), "operation": "READ"}
     elif any(phrase in msg for phrase in ["clean cv", "fix duplicates", "organize cv"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_CLEANUP")
         return {"category": "CV_CLEANUP", "extracted_info": message.strip(), "operation": "UPDATE"}
     elif any(phrase in msg for phrase in ["help", "what can you do", "commands", "how to use"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_HELP")
         return {"category": "CV_HELP", "extracted_info": message.strip(), "operation": "READ"}
     
     # LEGACY SUPPORT (backward compatibility)
     elif any(phrase in msg for phrase in ["skill", "learned", "achieved"]):
+        print("[DEBUG] classify_message_fallback: Detected SKILL_ADD")
         return {"category": "SKILL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["worked", "job", "experience"]):
+        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_ADD")
         return {"category": "EXPERIENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["degree", "certification", "education"]):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_ADD")
         return {"category": "EDUCATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     elif any(phrase in msg for phrase in ["project", "built", "developed", "created", "app", "website", "system"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_ADD")
         return {"category": "PROJECT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
     # Check for LinkedIn blog commands more broadly (catch-all)
     elif any(phrase in msg for phrase in ["linkedin", "blog", "post", "social media"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
         return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
     
-    else:
-        return {"category": "OTHER", "extracted_info": message.strip(), "operation": "READ"}
+    print("[DEBUG] classify_message_fallback: Detected OTHER")
+    return {"category": "OTHER", "extracted_info": message.strip(), "operation": "READ"}
 
 def update_cv_section_smart(cv_content: str, section_name: str, update_info: str) -> str:
     """Update a specific section of the CV using OpenAI without creating new sections"""
@@ -1349,41 +1733,53 @@ def extract_existing_projects_from_cv(cv_content: str, sections: dict) -> List[d
     return []
 
 def extract_section_from_cv(cv_content: str, section_name: str) -> str:
-    """Extract a section from the CV text by section header (case-insensitive, flexible, supports many variations)."""
-    # Accept variations for 'projects' section
-    section_patterns = [
-        r'^\s*PROJECTS?\s*$',
-        r'^\s*KEY\s+PROJECTS?\s*$',
-        r'^\s*NOTABLE\s+PROJECTS?\s*$',
-        r'^\s*PERSONAL\s+PROJECTS?\s*$',
-        r'^\s*PORTFOLIO\s*$',
-        r'^\s*SELECTED\s+PROJECTS?\s*$',
-        r'^\s*MAJOR\s+PROJECTS?\s*$',
-        r'^\s*PROJECT\s+EXPERIENCE\s*$',
-        r'^\s*PROFESSIONAL\s+PROJECTS?\s*$',
-        r'^\s*TECHNICAL\s+PROJECTS?\s*$',
-        r'^\s*PROJECTS?\s+AND\s+ACHIEVEMENTS\s*$',
-        r'^\s*PROJECTS?\s+PORTFOLIO\s*$',
-        r'^\s*PROJECTS?\s+SUMMARY\s*$',
-    ]
-    pattern = None
-    for pat in section_patterns:
-        regex = re.compile(pat, re.IGNORECASE | re.MULTILINE)
+    """Extract a section from the CV text by section header (case-insensitive, robust, supports many variations)."""
+    # Build a robust regex for the requested section
+    section_patterns = {
+        'education': [
+            r'[_\-\s]*EDUCATION[_\-\s]*',
+            r'[_\-\s]*EDUCATIONAL\s+BACKGROUND[_\-\s]*',
+            r'[_\-\s]*ACADEMIC\s+BACKGROUND[_\-\s]*',
+            r'[_\-\s]*QUALIFICATIONS[_\-\s]*'
+        ],
+        'experience': [
+            r'[_\-\s]*EXPERIENCE[_\-\s]*',
+            r'[_\-\s]*WORK\s+EXPERIENCE[_\-\s]*',
+            r'[_\-\s]*PROFESSIONAL\s+EXPERIENCE[_\-\s]*',
+            r'[_\-\s]*EMPLOYMENT\s+HISTORY[_\-\s]*',
+            r'[_\-\s]*CAREER\s+HISTORY[_\-\s]*'
+        ],
+        'skills': [
+            r'[_\-\s]*SKILLS[_\-\s]*',
+            r'[_\-\s]*TECHNICAL\s+SKILLS[_\-\s]*',
+            r'[_\-\s]*CORE\s+COMPETENCIES[_\-\s]*',
+            r'[_\-\s]*TECHNOLOGIES[_\-\s]*',
+            r'[_\-\s]*TECHNICAL\s+COMPETENCIES[_\-\s]*'
+        ],
+        'projects': [
+            r'[_\-\s]*PROJECTS[_\-\s]*',
+            r'[_\-\s]*PERSONAL\s+PROJECTS[_\-\s]*',
+            r'[_\-\s]*PORTFOLIO[_\-\s]*',
+            r'[_\-\s]*SELECTED\s+PROJECTS?[_\-\s]*',
+            r'[_\-\s]*MAJOR\s+PROJECTS?[_\-\s]*',
+            r'[_\-\s]*PROJECT\s+EXPERIENCE[_\-\s]*',
+            r'[_\-\s]*PROFESSIONAL\s+PROJECTS?[_\-\s]*',
+            r'[_\-\s]*TECHNICAL\s+PROJECTS?[_\-\s]*',
+            r'[_\-\s]*PROJECTS?\s+AND\s+ACHIEVEMENTS[_\-\s]*',
+            r'[_\-\s]*PROJECTS?\s+PORTFOLIO[_\-\s]*',
+            r'[_\-\s]*PROJECTS?\s+SUMMARY[_\-\s]*'
+        ]
+    }
+    patterns = section_patterns.get(section_name.lower(), [rf'[_\-\s]*{section_name.upper()}[_\-\s]*'])
+    for pat in patterns:
+        regex = re.compile(rf'^{pat}$\n*([\s\S]*?)(?=^[_\-\s]*[A-Z][A-Z\s&]+[_\-\s]*$|$)', re.IGNORECASE | re.MULTILINE)
         match = regex.search(cv_content)
         if match:
-            pattern = pat
-            start = match.end()
-            print(f"[DEBUG] Matched projects section header with pattern: {pat}")
-            break
-    if not pattern:
-        print(f"[DEBUG] No section header found for 'projects' (tried {len(section_patterns)} patterns).")
-        return None
-    # Find the next section header (all-caps or title-case word at line start)
-    next_section = re.search(r"^\s*[A-Z][A-Za-z\s&-]{2,}[:\-\s]*$", cv_content[start:], re.MULTILINE)
-    end = start + next_section.start() if next_section else len(cv_content)
-    section_text = cv_content[start:end].strip()
-    print(f"[DEBUG] Extracted section 'projects':\n{section_text[:500]}\n---END SECTION---")
-    return section_text
+            section_text = match.group(1).strip()
+            print(f"[DEBUG] Extracted section '{section_name}':\n{section_text[:500]}\n---END SECTION---")
+            return section_text
+    print(f"[DEBUG] No section header found for '{section_name}' (tried {len(patterns)} patterns).")
+    return ''
 
 def parse_cv_sections(cv_content: str) -> dict:
     """Parse CV content to identify sections and their positions"""
@@ -1574,13 +1970,16 @@ async def root():
     return {"message": "CV Updater Chatbot API with OpenAI"}
 
 @app.post("/upload-cv/")
-async def upload_cv(file: UploadFile = File(...)):
+async def upload_cv(
+    file: UploadFile = File(...),
+    extracted_text: str = Form(None)
+):
     """Enhanced CV upload with better error handling and validation"""
     try:
         print(f"🔄 Starting upload process for: {file.filename}")
         
-        # Extract text from file with enhanced validation
-        cv_text = extract_text_from_file(file)
+        # Use extracted_text if provided, else extract from file
+        cv_text = extracted_text or extract_text_from_file(file)
         
         if not cv_text or len(cv_text.strip()) < 50:
             raise HTTPException(
@@ -1588,7 +1987,7 @@ async def upload_cv(file: UploadFile = File(...)):
                 detail="The uploaded file doesn't contain enough readable text. Please ensure your CV has substantial content."
             )
         
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # Generate a title from filename
             title = file.filename.replace('.pdf', '').replace('.docx', '').replace('.txt', '').replace('_', ' ').title()
             
@@ -1640,7 +2039,7 @@ async def upload_cv(file: UploadFile = File(...)):
 @app.post("/chat/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
                           (request.message, "user"))
         
@@ -1678,16 +2077,28 @@ async def chat(request: ChatRequest):
                         "PROJECT_ADD": "projects",
                         "CONTACT_ADD": "contact"
                     }
-                    
                     section_type = section_map.get(category, "skills")
-                    updated_cv, response_text = create_cv_item(cv_content, section_type, extracted_info)
-                    
-                    if updated_cv != cv_content:
-                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-                        cv_updated = True
-                        response_text += f" Your CV has been automatically updated and the changes are now visible."
-                    
-                    # Also add projects to the projects database for better tracking
+                    if category == "EDUCATION_ADD":
+                        print(f"[DIAG] Incoming EDUCATION_ADD. Extracted info: {extracted_info}")
+                        print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find('education'):][:500]}")
+                        updated_cv = insert_content_in_section_enhanced(cv_content, "education", extracted_info, "append")
+                        print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find('education'):][:500]}")
+                        if updated_cv != cv_content:
+                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                            cv_updated = True
+                            print(f"[DIAG] DB updated with new education section.")
+                            # Extract and return the updated education section
+                            education_section = extract_section_from_cv(updated_cv, 'education')
+                            response_text = f"✅ Added to education section! Your CV has been updated.\n\n**Updated Education Section:**\n{education_section}"
+                        else:
+                            print(f"[DIAG] No changes made to education section.")
+                            response_text = "⚠️ No changes made to your education section."
+                    else:
+                        updated_cv, response_text = create_cv_item(cv_content, section_type, extracted_info)
+                        if updated_cv != cv_content:
+                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                            cv_updated = True
+                            response_text += f" Your CV has been automatically updated and the changes are now visible."
                     if category == "PROJECT_ADD":
                         try:
                             project_data = extract_project_from_message(extracted_info)
@@ -1735,14 +2146,27 @@ async def chat(request: ChatRequest):
                         "PROJECT_UPDATE": "projects",
                         "CONTACT_UPDATE": "contact"
                     }
-                    
                     section_type = section_map.get(category, "skills")
-                    updated_cv, response_text = update_cv_item(cv_content, section_type, extracted_info)
-                    
-                    if updated_cv != cv_content:
-                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-                        cv_updated = True
-                        response_text += f" The changes are now visible in your CV."
+                    if category == "EDUCATION_UPDATE":
+                        print(f"[DIAG] Incoming EDUCATION_UPDATE. Extracted info: {extracted_info}")
+                        print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find('education'):][:500]}")
+                        updated_cv = insert_content_in_section_enhanced(cv_content, "education", extracted_info, "append")
+                        print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find('education'):][:500]}")
+                        if updated_cv != cv_content:
+                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                            cv_updated = True
+                            print(f"[DIAG] DB updated with new education section.")
+                            education_section = extract_section_from_cv(updated_cv, 'education')
+                            response_text = f"✅ Updated education section! Your CV has been updated.\n\n**Updated Education Section:**\n{education_section}"
+                        else:
+                            print(f"[DIAG] No changes made to education section.")
+                            response_text = "⚠️ No changes made to your education section."
+                    else:
+                        updated_cv, response_text = update_cv_item(cv_content, section_type, extracted_info)
+                        if updated_cv != cv_content:
+                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                            cv_updated = True
+                            response_text += f" The changes are now visible in your CV."
             
             # ===== DELETE OPERATIONS =====
             elif category in ["SKILL_DELETE", "EXPERIENCE_DELETE", "EDUCATION_DELETE", "PROJECT_DELETE", "CONTACT_DELETE"]:
@@ -1898,7 +2322,7 @@ async def chat(request: ChatRequest):
 @app.get("/cv/current/", response_model=CVResponse)
 async def get_current_cv():
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # Get the active CV with current content (includes all updates)
             cursor.execute("SELECT filename, current_content, updated_at FROM cvs WHERE is_active = TRUE LIMIT 1")
             cv_row = cursor.fetchone()
@@ -1964,7 +2388,7 @@ def format_cv_for_display(cv_content: str) -> str:
 async def list_all_cvs():
     """Get list of all CVs with metadata"""
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             cursor.execute('''SELECT id, title, filename, created_at, updated_at, is_active 
                              FROM cvs ORDER BY updated_at DESC''')
             cvs = cursor.fetchall()
@@ -2193,7 +2617,7 @@ class ProjectRequest(BaseModel):
 @app.get("/projects/")
 async def get_projects():
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # First check for manually created projects - INCLUDE ID!
             cursor.execute("SELECT id, project_data FROM manual_projects ORDER BY created_at DESC")
             manual_projects = cursor.fetchall()
@@ -2233,7 +2657,7 @@ async def create_project_from_chat(request: ChatProjectRequest):
                 "project": None
             }
 
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # Create manual_projects table if it doesn't exist
             cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2367,7 +2791,7 @@ def extract_project_from_chat_message(message: str) -> dict:
 @app.post("/projects/create")
 async def create_project(project: ProjectRequest):
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # Create manual_projects table if it doesn't exist
             cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2397,7 +2821,7 @@ async def create_project(project: ProjectRequest):
 async def clear_all_projects():
     """Clear all projects from the database"""
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             cursor.execute("DELETE FROM manual_projects")
             return {"message": "All projects cleared successfully"}
     except Exception as e:
@@ -2406,7 +2830,7 @@ async def clear_all_projects():
 @app.get("/projects/list")
 async def list_projects_with_ids():
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             cursor.execute("SELECT id, project_data FROM manual_projects ORDER BY created_at DESC")
             manual_projects = cursor.fetchall()
             
@@ -3407,6 +3831,59 @@ Generated on {datetime.now().strftime('%B %d, %Y')} | CV Updater Platform
 
 @app.post("/cv/download")
 async def download_cv():
+    """Download CV as enhanced PDF with proper formatting."""
+    try:
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("SELECT current_content, filename FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No active CV found")
+            
+            cv_content, filename = cv_row
+            
+            # Generate enhanced PDF
+            pdf_bytes = generate_enhanced_pdf(cv_content)
+            
+            # Create filename for download
+            base_name = os.path.splitext(filename)[0] if filename else "cv"
+            download_filename = f"{base_name}_updated.pdf"
+            
+            return Response(
+                content=pdf_bytes.getvalue(),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+            )
+            
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
+
+@app.get("/cv/pdf-preview")
+async def get_cv_pdf_preview():
+    """Get CV as PDF for preview (not download)."""
+    try:
+        with get_db_cursor_context() as (cursor, conn):
+            cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No active CV found")
+            
+            cv_content = cv_row[0]
+            
+            # Generate enhanced PDF
+            pdf_bytes = generate_enhanced_pdf(cv_content)
+            
+            return Response(
+                content=pdf_bytes.getvalue(),
+                media_type="application/pdf",
+                headers={"Content-Disposition": "inline"}
+            )
+            
+    except Exception as e:
+        print(f"Error generating PDF preview: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
     try:
         # Generate updated CV with all projects and pending updates
         with get_db_cursor() as (cursor, conn):
@@ -3490,6 +3967,60 @@ async def download_cv():
     except Exception as e:
         print(f"Error generating complete CV document: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error downloading complete CV: {str(e)}")
+
+@app.post("/diagnostics/education-update-test")
+async def education_update_test():
+    """Simulate an education update and return before/after CV content and update status for diagnostics."""
+    try:
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            if not cv_row:
+                return {"success": False, "message": "No active CV found."}
+            before_cv = cv_row[0]
+            test_message = "Add MSc in AI at Oxford to my education"
+            print("[DIAG] Simulating education update with message:", test_message)
+            updated_cv = insert_in_education_section(before_cv, test_message)
+            update_made = updated_cv != before_cv
+            if update_made:
+                cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                print("[DIAG] Education section updated in DB.")
+            else:
+                print("[DIAG] No changes made to education section.")
+            return {
+                "success": True,
+                "test_message": test_message,
+                "before_cv_excerpt": before_cv[before_cv.lower().find('education'):][:500],
+                "after_cv_excerpt": updated_cv[updated_cv.lower().find('education'):][:500],
+                "update_made": update_made
+            }
+    except Exception as e:
+        print(f"[DIAG] Error in education update test: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/diagnostics/db-cv-dump")
+async def db_cv_dump():
+    """Return all rows from the cvs table for diagnostics."""
+    import sqlite3
+    try:
+        conn = sqlite3.connect('cv_updater.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, filename, current_content, updated_at, is_active FROM cvs ORDER BY updated_at DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        result = [
+            {
+                "id": row[0],
+                "filename": row[1],
+                "current_content": row[2],
+                "updated_at": row[3],
+                "is_active": bool(row[4])
+            }
+            for row in rows
+        ]
+        return JSONResponse(content={"cvs": result})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 # Vercel handler - add this at the end of the file
 handler = app

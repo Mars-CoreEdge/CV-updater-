@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
 const CVContainer = styled.div`
   display: flex;
@@ -515,12 +515,60 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
   const [cvData, setCvData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [highlightEducation, setHighlightEducation] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const educationRef = useRef(null);
 
   useEffect(() => {
     if (cvUploaded) {
       loadCV();
     }
   }, [cvUploaded]);
+
+  // Listen for cv-updated event to auto-refresh
+  useEffect(() => {
+    const handleCVUpdated = (e) => {
+      console.log('[DIAG] CV update event received:', e.detail);
+      loadCV();
+      // After loading, highlight education section
+      setTimeout(() => {
+        setHighlightEducation(true);
+        setTimeout(() => setHighlightEducation(false), 2500);
+      }, 800);
+    };
+    window.addEventListener('cv-updated', handleCVUpdated);
+    return () => window.removeEventListener('cv-updated', handleCVUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (highlightEducation && educationRef.current) {
+      educationRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[DIAG] Scrolled to and highlighted education section.');
+    }
+  }, [highlightEducation]);
+
+  // Load PDF preview when CV data changes
+  useEffect(() => {
+    if (cvData && cvData.content) {
+      loadPdfPreview();
+    }
+  }, [cvData]);
+
+  const loadPdfPreview = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/cv/pdf-preview`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+    } catch (error) {
+      console.error('Error loading PDF preview:', error);
+      setPdfUrl(null);
+    }
+  };
 
   const formatCVContent = (content) => {
     if (!content) return '';
@@ -571,6 +619,13 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
     const formattedContent = formattedLines.join('\n');
     console.log('Formatted content length:', formattedContent.length);
     
+    // Highlight education section if needed
+    if (highlightEducation) {
+      // Use regex to find the education section and wrap it in a span
+      return formattedContent.replace(/(═══\s*EDUCATION[\s\S]*?)(═══|$)/i, (match, p1, p2) => {
+        return `<span ref="education-section" style="background: #fffbe6; border-radius: 6px; box-shadow: 0 0 0 2px #ffe066; padding: 2px 4px;">${p1}</span>${p2}`;
+      });
+    }
     return formattedContent;
   };
 
@@ -834,6 +889,14 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
                 🔄 Refresh
               </div>
             </RefreshButton>
+            <Button 
+              variant="secondary" 
+              onClick={() => setShowPdfPreview(!showPdfPreview)}
+            >
+              <div className="button-content">
+                {showPdfPreview ? '📄 Hide PDF' : '📄 Show PDF'}
+              </div>
+            </Button>
             <Button variant="secondary" onClick={printCV}>
               <div className="button-content">
                 🖨️ Print
@@ -923,16 +986,24 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
                 {cvData.content && cvData.content.length > 100 ? 'Full Content' : 'Placeholder'}
               </div>
             </CVStats>
-            <div style={{ 
-              whiteSpace: 'pre-wrap', 
-              lineHeight: 1.8,
-              fontSize: '1rem',
-              fontFamily: '"Georgia", "Times New Roman", serif',
-              textAlign: 'justify',
-              color: '#1a202c'
-            }}>
-              {formatCVContent(cvData.content)}
-            </div>
+            <div
+              ref={highlightEducation ? educationRef : null}
+              style={highlightEducation ? { transition: 'background 0.5s', background: '#fffbe6', borderRadius: '6px', boxShadow: '0 0 0 2px #ffe066' } : {}}
+              dangerouslySetInnerHTML={{ __html: formatCVContent(cvData.content) }}
+            />
+            
+            {showPdfPreview && pdfUrl && (
+              <div style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ padding: '10px', background: '#f8f9fa', borderBottom: '1px solid #ddd', fontWeight: 'bold' }}>
+                  📄 PDF Preview
+                </div>
+                <iframe
+                  src={pdfUrl}
+                  style={{ width: '100%', height: '600px', border: 'none' }}
+                  title="CV PDF Preview"
+                />
+              </div>
+            )}
           </>
         ) : cvData && !cvData.content ? (
           <PlaceholderMessage>

@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
 const ChatContainer = styled.div`
   display: flex;
@@ -808,6 +808,8 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
         console.log(`🔄 Triggering CV refresh due to ${crudOperation || 'detected'} operation`);
         onCVUpdate(true);
         setLastUpdateCheck(Date.now());
+        // Dispatch a custom event to trigger CV refresh in other components
+        window.dispatchEvent(new CustomEvent('cv-updated', { detail: { reason: 'chat' } }));
       }
 
     } catch (error) {

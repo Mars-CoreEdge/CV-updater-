@@ -1,29 +1,27 @@
 # Dependencies
 node_modules/
 */node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment Variables (CRITICAL - Never commit these)
+# Production builds
+build/
+dist/
+*/build/
+*/dist/
+
+# Environment variables
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-frontend/.env
-backend/.env
-
-# API Keys and Secrets (CRITICAL)
-**/api_key.txt
-**/openai_key.txt
-**/*api_key*
-**/*secret*
-**/*password*
 
 # Database files
 *.db
 *.sqlite
 *.sqlite3
-cv_builder.db
-backend/cv_builder.db
 
 # Python
 __pycache__/
@@ -31,39 +29,20 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual environments
-venv/
 env/
+venv/
 ENV/
 env.bak/
 venv.bak/
-.venv/
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -72,20 +51,9 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# React/Frontend
-frontend/build/
-frontend/dist/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
 # Logs
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
 
 # Runtime data
 pids
@@ -95,69 +63,10 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage/
-*.lcov
 
-# nyc test coverage
-.nyc_output
+# Temporary files
+*.tmp
+*.temp
 
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# Test files that might contain sensitive data
-test_with_real_api.py
-test_api_key.py
-real_test_*.py
-
-# Backup files
-*.bak
-*.backup
-*.old
-
-# Documentation with potential secrets
-*secret*.md
-*key*.md
-*password*.md
+# Supabase
+.supabase/

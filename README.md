@@ -1,185 +1,130 @@
-# CV Updater Chatbot
+# CV Updater - AI-Powered CV Management System
 
-A modern web application that allows you to upload your CV and update it through conversational AI. Built with React.js, FastAPI, and SQLite.
+A modern web application that allows users to upload, edit, and manage their CVs using AI-powered chat interface. The system supports automatic section detection, dynamic content updates, and PDF generation.
 
 ## Features
 
-- 📄 **CV Upload**: Support for PDF, DOCX, and TXT files
-- 💬 **Conversational Updates**: Update your CV by chatting with the bot
-- 🔄 **Real-time Updates**: See your CV update in real-time as you add new achievements
-- 📋 **CV Display**: View your updated CV with a clean, professional layout
-- ⬇️ **Download**: Download your updated CV as a text file
-- 💾 **Persistent Storage**: All data is stored in SQLite database
+- **AI-Powered Chat Interface**: Update CV sections through natural language prompts
+- **Automatic Section Detection**: Robust regex-based identification of CV sections (Education, Experience, Skills, etc.)
+- **Dynamic Content Updates**: Add, modify, or append content to specific CV sections
+- **PDF Generation**: Convert updated CV content back to properly formatted PDFs
+- **Supabase Integration**: Modern PostgreSQL database with real-time updates
+- **Responsive UI**: Clean, modern interface built with React
 
 ## Tech Stack
 
-- **Frontend**: React.js with styled-components
-- **Backend**: FastAPI (Python)
-- **Database**: SQLite
-- **File Processing**: PyPDF2, docx2txt
+### Backend
+- **FastAPI** - Modern Python web framework
+- **PostgreSQL** - Database (via Supabase)
+- **OpenAI API** - AI-powered chat and content processing
+- **ReportLab** - PDF generation
 
-## Setup Instructions
+### Frontend
+- **React** - User interface
+- **Supabase Client** - Database and authentication
+- **Tailwind CSS** - Styling
+
+## Quick Start
 
 ### Prerequisites
-
 - Python 3.8+
 - Node.js 16+
-- npm or yarn
+- Supabase account
+- OpenAI API key
 
 ### Backend Setup
-
-1. **Clone the repository** (if you haven't already)
-   ```bash
-   git clone <repository-url>
-   cd CV-updater-
-   ```
-
-2. **Create a virtual environment** (recommended)
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Start the FastAPI backend**
-   ```bash
-   cd backend
-   python main.py
-   ```
-   
-   The backend will be available at `http://localhost:8000`
+```bash
+cd backend
+pip install -r requirements.txt
+```
 
 ### Frontend Setup
+```bash
+cd frontend
+npm install
+```
 
-1. **Install Node.js dependencies**
-   ```bash
-   cd frontend
-   npm install
-   ```
+### Environment Configuration
+1. Create `.env` file in backend directory:
+```
+OPENAI_API_KEY=your_openai_api_key
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
 
-2. **Start the React development server**
-   ```bash
-   npm start
-   ```
-   
-   The frontend will be available at `http://localhost:3000`
+2. Create `.env` file in frontend directory:
+```
+REACT_APP_SUPABASE_URL=your_supabase_url
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Database Setup
+1. Run the Supabase setup script:
+```bash
+psql -h your_supabase_host -U postgres -d postgres -f supabase-database-setup.sql
+```
+
+2. Apply storage policies:
+```bash
+psql -h your_supabase_host -U postgres -d postgres -f storage-policies.sql
+```
+
+### Running the Application
+```bash
+# Start backend
+cd backend
+python main_enhanced.py
+
+# Start frontend (in new terminal)
+cd frontend
+npm start
+```
 
 ## Usage
 
-1. **Upload Your CV**
-   - Navigate to `http://localhost:3000`
-   - Click the upload area or drag and drop your CV file
-   - Supported formats: PDF, DOCX, TXT
-
-2. **Chat to Update Your CV**
-   - Once uploaded, start chatting with the bot
-   - Tell it about your new skills, experience, or education
-   - Examples:
-     - "I have achieved the skill React.js"
-     - "I worked as a Software Developer at XYZ Company from Jan 2023 to Dec 2023"
-     - "I completed a certification in Data Science"
-
-3. **View Updated CV**
-   - Your CV will be displayed on the right side
-   - Updates appear in real-time as you chat
-   - Click "Download" to save your updated CV
-
-## Example Conversations
-
-```
-User: I have achieved the skill React.js
-Bot: Great! I've noted that you've gained the skill: React.js. This will be included in your updated CV.
-
-User: I worked as a Frontend Developer at Tech Corp
-Bot: Excellent! I've recorded your new experience: I worked as a Frontend Developer at Tech Corp. This will be added to your CV.
-
-User: I completed a certification in AWS Cloud Computing
-Bot: Wonderful! I've noted your educational achievement: I completed a certification in AWS Cloud Computing. This will be reflected in your CV.
-```
-
-## API Endpoints
-
-- `POST /upload-cv/` - Upload CV file
-- `POST /chat/` - Send chat message
-- `GET /cv/current/` - Get updated CV
-- `GET /chat/history/` - Get chat history
+1. **Upload CV**: Upload your CV file (PDF, DOCX, or TXT)
+2. **Chat Interface**: Use natural language to update your CV:
+   - "Add MSc in AI at Oxford to my education"
+   - "Update my skills with React and Node.js"
+   - "Add a new project: E-commerce website"
+3. **View Updates**: See real-time updates in the CV display panel
+4. **Download**: Generate and download the updated PDF
 
 ## Project Structure
 
 ```
-CV-updater-/
+CV-updater/
 ├── backend/
-│   ├── main.py          # FastAPI application
-│   ├── models.py        # Database models
-│   ├── schemas.py       # Pydantic schemas
-│   └── database.py      # Database configuration
+│   ├── main_enhanced.py      # Main FastAPI application
+│   └── requirements.txt      # Python dependencies
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── FileUpload.js
-│   │   │   ├── ChatInterface.js
-│   │   │   └── CVDisplay.js
-│   │   ├── App.js
-│   │   └── index.js
-│   ├── public/
-│   └── package.json
-├── requirements.txt     # Python dependencies
+│   │   ├── components/       # React components
+│   │   ├── services/         # API services
+│   │   └── contexts/         # React contexts
+│   ├── package.json
+│   └── public/
+├── supabase-database-setup.sql
+├── storage-policies.sql
 └── README.md
 ```
 
-## Development
+## API Endpoints
 
-### Backend Development
-
-The backend uses FastAPI with SQLAlchemy for database operations. Key components:
-
-- **Models**: Define database schema for CVs, chat messages, and updates
-- **Schemas**: Pydantic models for request/response validation
-- **Main**: FastAPI application with all endpoints
-
-### Frontend Development
-
-The frontend is a React.js application with:
-
-- **FileUpload**: Drag-and-drop CV upload component
-- **ChatInterface**: Real-time chat with the bot
-- **CVDisplay**: Display and download updated CV
-
-### Adding New Features
-
-1. **New CV Update Types**: Add new processing logic in `process_cv_update()` function
-2. **Enhanced NLP**: Integrate with OpenAI or other NLP services for better message processing
-3. **User Authentication**: Add user management for multi-user support
-4. **Export Formats**: Add PDF/DOCX export functionality
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Backend not starting**: Check if all dependencies are installed
-2. **File upload fails**: Ensure file is in supported format (PDF, DOCX, TXT)
-3. **CORS errors**: Verify backend is running on port 8000
-4. **Chat not working**: Check backend logs for errors
-
-### Development Tips
-
-- Use browser developer tools to debug frontend issues
-- Check FastAPI docs at `http://localhost:8000/docs` for API testing
-- Monitor backend console for error messages
-
-## License
-
-This project is open source and available under the [MIT License](LICENSE).
+- `POST /upload-cv/` - Upload and process CV file
+- `POST /chat/` - AI chat interface for CV updates
+- `GET /cv/current/` - Get current CV content
+- `GET /cv/download/` - Download CV as PDF
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Submit a pull request
+4. Test thoroughly
+5. Submit a pull request
 
-For bug reports and feature requests, please create an issue on GitHub. 
+## License
+
+This project is licensed under the MIT License. 
