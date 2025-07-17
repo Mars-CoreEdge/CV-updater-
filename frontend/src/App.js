@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import FileUpload from './components/FileUpload';
@@ -490,25 +490,24 @@ const NavButton = styled.button`
     transition: var(--transition-professional);
   }
   
+  /* Removed hover effect from NavButton */
+  /*
   &:hover {
     transform: translateY(-4px) scale(1.03);
     box-shadow: var(--shadow-enterprise);
     border-color: rgba(102, 126, 234, 0.2);
     color: white;
   }
-  
   &:hover::before {
     opacity: 1;
   }
-  
   &:hover::after {
     left: 100%;
   }
-  
   &:active {
     transform: translateY(-2px) scale(1.02);
   }
-  
+  */
   .button-content {
     display: flex;
     align-items: center;
@@ -517,30 +516,24 @@ const NavButton = styled.button`
     position: relative;
     z-index: 1;
   }
-  
   .icon {
     font-size: 1.3rem;
     transition: var(--transition-professional);
     filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.1));
   }
-  
-  &:hover .icon {
+  /* &:hover .icon {
     transform: scale(1.15) rotate(5deg);
-  }
-  
+  } */
   &.secondary {
     border-color: rgba(0, 200, 81, 0.1);
-    
     &::before {
       background: var(--success-gradient);
     }
-    
-    &:hover {
+    /* &:hover {
       border-color: rgba(0, 200, 81, 0.2);
       box-shadow: var(--shadow-glow-success);
-    }
+    } */
   }
-  
   @media (max-width: 768px) {
     padding: var(--spacing-md) var(--spacing-lg);
     font-size: var(--font-size-xs);
@@ -711,7 +704,6 @@ const ConnectionIndicator = styled.div`
 
 function CVUpdaterContent() {
   const [cvUploaded, setCvUploaded] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(false);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
@@ -720,18 +712,11 @@ function CVUpdaterContent() {
     console.log('File upload completed:', uploadSuccess);
     if (uploadSuccess) {
       setCvUploaded(Date.now()); // Use timestamp to force refresh
-      setRefreshTrigger(Date.now()); // Also trigger general refresh
     }
   };
 
   const handleChatUpdate = (isContentUpdate = false) => {
-    if (isContentUpdate) {
-      // Force CV refresh when content is updated
-      setRefreshTrigger(Date.now());
-    } else {
-      // Normal chat update
-      setRefreshTrigger(!refreshTrigger);
-    }
+    // Normal chat update
   };
 
   const handleLogout = async () => {
@@ -868,12 +853,12 @@ function CVUpdaterContent() {
                   </div>
                 </NavButton>
                 
-                <NavButton onClick={() => navigate('/project-management')}>
+                {/* <NavButton onClick={() => navigate('/project-management')}>
                   <div className="button-content">
                     <span className="icon">🚀</span>
                     Manage Projects
                   </div>
-                </NavButton>
+                </NavButton> */}
                 
                 {cvUploaded && (
                   <NavButton onClick={() => navigate('/projects')}>
@@ -888,7 +873,6 @@ function CVUpdaterContent() {
               <ModernCard style={{height: 'fit-content'}}>
                 <CVDisplay 
                   cvUploaded={cvUploaded} 
-                  refreshTrigger={refreshTrigger}
                 />
               </ModernCard>
             </RightPanel>

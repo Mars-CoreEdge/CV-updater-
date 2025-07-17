@@ -276,29 +276,6 @@ const PreviewSection = styled.div`
   }
 `;
 
-const StepsPanel = styled.div`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(25px);
-  border-radius: 24px;
-  padding: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  height: fit-content;
-  box-shadow: 
-    0 20px 60px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  position: sticky;
-  top: 120px;
-  
-  h3 {
-    color: white;
-    margin-bottom: 25px;
-    font-size: 1.3rem;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.02em;
-  }
-`;
-
 const StepItem = styled.div`
   display: flex;
   align-items: center;
@@ -373,84 +350,6 @@ const StepItem = styled.div`
   }
 `;
 
-const FormPanel = styled.div`
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(25px);
-  border-radius: 24px;
-  padding: 45px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 
-    0 25px 80px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  position: relative;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent);
-  }
-`;
-
-const PreviewPanel = styled.div`
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(25px);
-  border-radius: 24px;
-  padding: 35px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  height: fit-content;
-  box-shadow: 
-    0 25px 80px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  position: sticky;
-  top: 120px;
-  max-height: 80vh;
-  overflow-y: auto;
-  
-  /* Custom scrollbar */
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 3px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 3px;
-  }
-  
-  h3 {
-    color: #2c3e50;
-    margin-bottom: 25px;
-    font-size: 1.3rem;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.02em;
-    border-bottom: 2px solid #f1f3f4;
-    padding-bottom: 15px;
-  }
-`;
-
-const SectionTitle = styled.h2`
-  color: #1e293b;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-  letter-spacing: -0.02em;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #f1f5f9;
-`;
-
 const FormGroup = styled.div`
   margin-bottom: 24px;
   position: relative;
@@ -471,10 +370,6 @@ const Label = styled.label`
     margin-left: 4px;
     font-weight: 700;
   }
-`;
-
-const InputWrapper = styled.div`
-  position: relative;
 `;
 
 const Input = styled.input`
@@ -890,6 +785,17 @@ const StepContent = styled.div`
     line-height: 1.3;
     transition: color 0.2s ease;
   }
+`;
+
+const SectionTitle = styled.h2`
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: -0.01em;
 `;
 
 function CVBuilderPage() {

@@ -5,6 +5,13 @@ from pydantic import BaseModel
 import sqlite3
 import PyPDF2
 import docx2txt
+from dotenv import load_dotenv
+import os
+import requests
+import re
+
+# Load .env from the backend directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), 'backend', '.env'))
 
 # Advanced PDF Processing Libraries
 try:
@@ -48,14 +55,14 @@ except ImportError:
     OpenAI = None
 
 # Initialize OpenAI client with API key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("VITE_OPENAI_API_KEY")
 
 if not HAS_OPENAI:
     print("⚠️  Warning: OpenAI library not installed. Chat features will not work.")
     openai_client = None
 elif not OPENAI_API_KEY or not OPENAI_API_KEY.startswith('sk-'):
     print("⚠️  Warning: OpenAI API key not set or invalid. Chat features will not work.")
-    print("💡 Set OPENAI_API_KEY environment variable with your API key")
+    print("💡 Set VITE_OPENAI_API_KEY environment variable with your API key")
     openai_client = None
 else:
     try:
@@ -349,7 +356,7 @@ def classify_message(message: str, cv_content: str = None) -> dict:
             cv_context = f"\n\nCurrent CV Content Preview:\n{cv_content[:500]}..."
         
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": f"""You are a CV assistant with full CRUD capabilities. Classify messages to perform Create, Read, Update, Delete operations on CV content:
 
@@ -516,7 +523,7 @@ Instructions:
 Updated CV:"""
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2000
@@ -584,10 +591,31 @@ def update_cv_section_manual(cv_content: str, section_name: str, update_info: st
     
     return '\n'.join(lines)
 
-def extract_projects_from_cv(cv_content: str) -> List[dict]:
-    """Disabled automatic project extraction - projects must be added manually"""
-    # No longer automatically extract projects from CV content
-    return []
+def extract_projects_from_cv(cv_content: str) -> list:
+    """Extract projects from the 'Projects' section of the CV text."""
+    projects_section = extract_section_from_cv(cv_content, 'projects')
+    if not projects_section:
+        print("[DEBUG] No 'Projects' section found in CV.")
+        return []
+    # Try to split by lines and look for project-like entries
+    lines = projects_section.split('\n')
+    projects = []
+    current_project = ''
+    for line in lines:
+        line = line.strip()
+        # Heuristic: new project if line starts with number, bullet, or is all caps
+        if re.match(r"^(\d+\.|[-•*])\s+", line) or (line.isupper() and len(line) > 5):
+            if current_project:
+                projects.append(current_project.strip())
+                print(f"[DEBUG] Parsed project:\n{current_project.strip()}\n---END PROJECT---")
+            current_project = line
+        else:
+            current_project += '\n' + line
+    if current_project:
+        projects.append(current_project.strip())
+        print(f"[DEBUG] Parsed project:\n{current_project.strip()}\n---END PROJECT---")
+    print(f"[DEBUG] Total projects extracted: {len(projects)}")
+    return projects
 
 def extract_projects_fallback(cv_content: str) -> List[dict]:
     """Fallback method - now returns empty list to prevent automatic project creation"""
@@ -612,7 +640,7 @@ def extract_project_from_message(message: str) -> dict:
         If information is missing, use reasonable defaults."""
         
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=500
@@ -708,7 +736,7 @@ def extract_education_from_message(message: str) -> str:
         Extract and format only the education, no bullet points or extra text."""
         
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=200
@@ -841,75 +869,73 @@ def extract_education_fallback(message: str) -> str:
 
 # ===== NEW CRUD HELPER FUNCTIONS =====
 
+def extract_main_keywords_from_message(message: str, section_type: str) -> str:
+    """Extract main keywords for skills, experience, education, or projects from message."""
+    clean_message = message.lower().strip()
+    if section_type == 'skills':
+        clean_message = re.sub(r'^(i learned|i know|add skill|skilled in|i have|i can)\s*', '', clean_message).strip()
+        separators = [',', 'and', '&', '+', ';', '|']
+    elif section_type == 'experience':
+        clean_message = re.sub(r'^(i worked|i was employed|job at|worked as|i had a job)\s*', '', clean_message).strip()
+        separators = [',', 'and', '&', '+', ';', '|']
+    elif section_type == 'education':
+        clean_message = re.sub(r'^(i studied|graduated from|degree in|certification in|i have a degree in)\s*', '', clean_message).strip()
+        separators = [',', 'and', '&', '+', ';', '|']
+    elif section_type == 'projects':
+        clean_message = re.sub(r'^(i built|i created|i developed|project called|my project|i made)\s*', '', clean_message).strip()
+        separators = [',', 'and', '&', '+', ';', '|']
+    else:
+        separators = [',', 'and', '&', '+', ';', '|']
+    
+    keywords = []
+    parts = [clean_message]
+    for sep in separators:
+        new_parts = []
+        for part in parts:
+            new_parts.extend(part.split(sep))
+        parts = new_parts
+    for part in parts:
+        keyword = part.strip().title()
+        if keyword and len(keyword) > 1 and len(keyword.split()) <= 3:
+            keywords.append(keyword)
+    return ', '.join(keywords)
+
 def create_cv_item(cv_content: str, section_type: str, item_info: str) -> tuple[str, str]:
     """Create/add new item to CV section - APPENDS to existing content"""
     try:
         sections = parse_cv_sections(cv_content)
         cv_lines = cv_content.split('\n')
-        
-        # Extract and format new items
         new_items = []
-        
-        if section_type.lower() == 'skills':
-            extracted_skills = extract_skills_from_message(item_info)
-            # Split multiple skills and add each as separate item
-            skills_list = [s.strip() for s in extracted_skills.split(',') if s.strip()]
-            for skill in skills_list:
-                new_items.append(f"• {skill}")
-                
-        elif section_type.lower() == 'experience':
-            experience_text = extract_experience_from_message(item_info)
-            new_items.append(f"• {experience_text}")
-            
-        elif section_type.lower() == 'education':
-            education_text = extract_education_from_message(item_info)
-            new_items.append(f"• {education_text}")
-            
-        elif section_type.lower() == 'projects':
-            project_data = extract_project_from_message(item_info)
-            new_items.append(f"• {project_data['title']}: {project_data['description']}")
-            
+        if section_type.lower() in ['skills', 'experience', 'education', 'projects']:
+            extracted_keywords = extract_main_keywords_from_message(item_info, section_type.lower())
+            keywords_list = [s.strip() for s in extracted_keywords.split(',') if s.strip()]
+            for keyword in keywords_list:
+                new_items.append(f"• {keyword}")
         elif section_type.lower() == 'contact':
             contact_text = extract_contact_from_message(item_info)
             new_items.append(f"• {contact_text}")
         else:
             new_items.append(f"• {item_info}")
-        
         # Find the target section
         target_section = None
         for section_name in sections.keys():
             if section_type.lower() in section_name.lower():
                 target_section = section_name
                 break
-        
-        if target_section and target_section in sections:
-            # APPEND to existing section
-            section_info = sections[target_section]
-            insert_position = section_info['end_line']
-            
-            # Find the last non-empty line in the section
-            while (insert_position > section_info['content_start'] and 
-                   insert_position < len(cv_lines) and 
-                   not cv_lines[insert_position].strip()):
-                insert_position -= 1
-            
-            # Insert new items after the last content line
-            for i, new_item in enumerate(new_items):
-                cv_lines.insert(insert_position + 1 + i, new_item)
-            
-            updated_cv = '\n'.join(cv_lines)
-            added_text = ', '.join([item[2:] for item in new_items])  # Remove bullet points for display
-            return updated_cv, f"✅ Successfully added to existing {section_type.lower()} section: {added_text}"
-            
-        else:
-            # Create new section using smart integration
+        if not target_section:
+            # If section doesn't exist, create new section
             updated_cv = smart_section_integration(cv_content, section_type.lower(), new_items)
-            added_text = ', '.join([item[2:] for item in new_items])  # Remove bullet points for display
-            return updated_cv, f"✅ Successfully created new {section_type.lower()} section with: {added_text}"
-        
+            return updated_cv, f"✅ Added new {section_type.lower()} section with your input!"
+        # Otherwise, append to existing section
+        section_info = sections[target_section]
+        insert_position = section_info['end_line']
+        for i, item in enumerate(new_items):
+            cv_lines.insert(insert_position + i, item)
+        updated_cv = '\n'.join(cv_lines)
+        return updated_cv, f"✅ Added to {section_type.lower()} section!"
     except Exception as e:
         print(f"Error creating CV item: {e}")
-        return cv_content, f"❌ Failed to add {section_type.lower()} item: {str(e)}"
+        return cv_content, f"❌ Failed to add to {section_type.lower()} section: {str(e)}"
 
 def read_cv_section(cv_content: str, section_type: str) -> str:
     """Read and display specific CV section"""
@@ -953,34 +979,29 @@ def update_cv_item(cv_content: str, section_type: str, update_info: str) -> tupl
     try:
         sections = parse_cv_sections(cv_content)
         cv_lines = cv_content.split('\n')
-        
-        # Find the target section
         target_section = None
         for section_name in sections.keys():
             if section_type.lower() in section_name.lower():
                 target_section = section_name
                 break
-        
         if not target_section:
             # If section doesn't exist, treat as CREATE operation
             return create_cv_item(cv_content, section_type, update_info)
-        
         # Check if update_info specifies what to update
         if any(keyword in update_info.lower() for keyword in ['add', 'include', 'with']):
             # This is actually an ADD operation to existing section
             print(f"🔄 Treating UPDATE as ADD operation for {section_type}")
             return create_cv_item(cv_content, section_type, update_info)
-        
-        # Use the existing smart update function for actual modifications
-        updated_cv = update_cv_section_smart(cv_content, section_type.lower(), update_info)
-        
-        if updated_cv != cv_content:
-            return updated_cv, f"✅ Successfully updated {section_type.lower()} section! Changes have been applied to your CV."
-        else:
-            # Fallback: treat as add operation if no changes were made
-            print(f"🔄 No changes detected, treating UPDATE as ADD operation for {section_type}")
-            return create_cv_item(cv_content, section_type, update_info)
-        
+        # Use the main keyword extraction for update as well
+        extracted_keywords = extract_main_keywords_from_message(update_info, section_type.lower())
+        keywords_list = [s.strip() for s in extracted_keywords.split(',') if s.strip()]
+        if not keywords_list:
+            return cv_content, f"❌ No valid keywords found to update {section_type.lower()} section."
+        # For now, just append as new items (can be improved to replace existing in future)
+        for i, keyword in enumerate(keywords_list):
+            cv_lines.insert(sections[target_section]['end_line'] + i, f"• {keyword}")
+        updated_cv = '\n'.join(cv_lines)
+        return updated_cv, f"✅ Updated {section_type.lower()} section with new keywords!"
     except Exception as e:
         print(f"Error updating CV item: {e}")
         return cv_content, f"❌ Failed to update {section_type.lower()} section: {str(e)}"
@@ -1031,27 +1052,25 @@ def delete_cv_item(cv_content: str, section_type: str, item_info: str) -> tuple[
         return cv_content, f"❌ Failed to delete {section_type.lower()} item: {str(e)}"
 
 def extract_skills_from_message(message: str) -> str:
-    """Extract skills from message"""
+    """Extract skills from message, returning only main skill words, not the whole string."""
     # Remove common prefixes
     clean_message = re.sub(r'^(i learned|i know|add skill|skilled in|i have|i can)\s*', '', message.lower()).strip()
-    
     # Split on common separators and clean up
     skills = []
     separators = [',', 'and', '&', '+', ';', '|']
     parts = [clean_message]
-    
     for sep in separators:
         new_parts = []
         for part in parts:
             new_parts.extend(part.split(sep))
         parts = new_parts
-    
     for part in parts:
         skill = part.strip().title()
-        if skill and len(skill) > 1:
+        # Only add if it's a single word or short phrase (not the whole message)
+        if skill and len(skill) > 1 and len(skill.split()) <= 3:
             skills.append(skill)
-    
-    return ', '.join(skills) if skills else clean_message.title()
+    # Only return joined skills, never the whole message
+    return ', '.join(skills)
 
 def extract_experience_from_message(message: str) -> str:
     """Extract work experience from message"""
@@ -1329,53 +1348,42 @@ def extract_existing_projects_from_cv(cv_content: str, sections: dict) -> List[d
     # Return empty list to prevent automatic project extraction
     return []
 
-def extract_section_from_cv(cv_content: str, section_type: str) -> str:
-    """Extract a specific section from CV content based on actual text"""
-    if not cv_content:
-        return ""
-    
-    lines = cv_content.split('\n')
-    section_lines = []
-    in_section = False
-    section_keywords = {
-        'experience': ['experience', 'work', 'employment', 'professional', 'career', 'job'],
-        'skills': ['skills', 'technical', 'competencies', 'technologies', 'programming', 'languages'],
-        'education': ['education', 'academic', 'degree', 'university', 'college', 'school', 'qualification'],
-        'projects': ['projects', 'project', 'portfolio', 'work samples']
-    }
-    
-    keywords = section_keywords.get(section_type.lower(), [section_type.lower()])
-    
-    for line in lines:
-        line_lower = line.lower().strip()
-        
-        # Check if this line is a section header
-        is_section_header = any(keyword in line_lower for keyword in keywords) and (
-            line.isupper() or 
-            len(line.strip()) < 50 or
-            line.strip().endswith(':')
-        )
-        
-        if is_section_header:
-            in_section = True
-            section_lines.append(line)
-            continue
-        
-        # Check if we've moved to a different section
-        if in_section and line.isupper() and len(line.strip()) > 3:
-            # Check if this is a different section header
-            other_section = any(
-                any(kw in line_lower for kw in kws) 
-                for sect, kws in section_keywords.items() 
-                if sect != section_type.lower()
-            )
-            if other_section:
-                break
-        
-        if in_section and line.strip():
-            section_lines.append(line)
-    
-    return '\n'.join(section_lines) if section_lines else ""
+def extract_section_from_cv(cv_content: str, section_name: str) -> str:
+    """Extract a section from the CV text by section header (case-insensitive, flexible, supports many variations)."""
+    # Accept variations for 'projects' section
+    section_patterns = [
+        r'^\s*PROJECTS?\s*$',
+        r'^\s*KEY\s+PROJECTS?\s*$',
+        r'^\s*NOTABLE\s+PROJECTS?\s*$',
+        r'^\s*PERSONAL\s+PROJECTS?\s*$',
+        r'^\s*PORTFOLIO\s*$',
+        r'^\s*SELECTED\s+PROJECTS?\s*$',
+        r'^\s*MAJOR\s+PROJECTS?\s*$',
+        r'^\s*PROJECT\s+EXPERIENCE\s*$',
+        r'^\s*PROFESSIONAL\s+PROJECTS?\s*$',
+        r'^\s*TECHNICAL\s+PROJECTS?\s*$',
+        r'^\s*PROJECTS?\s+AND\s+ACHIEVEMENTS\s*$',
+        r'^\s*PROJECTS?\s+PORTFOLIO\s*$',
+        r'^\s*PROJECTS?\s+SUMMARY\s*$',
+    ]
+    pattern = None
+    for pat in section_patterns:
+        regex = re.compile(pat, re.IGNORECASE | re.MULTILINE)
+        match = regex.search(cv_content)
+        if match:
+            pattern = pat
+            start = match.end()
+            print(f"[DEBUG] Matched projects section header with pattern: {pat}")
+            break
+    if not pattern:
+        print(f"[DEBUG] No section header found for 'projects' (tried {len(section_patterns)} patterns).")
+        return None
+    # Find the next section header (all-caps or title-case word at line start)
+    next_section = re.search(r"^\s*[A-Z][A-Za-z\s&-]{2,}[:\-\s]*$", cv_content[start:], re.MULTILINE)
+    end = start + next_section.start() if next_section else len(cv_content)
+    section_text = cv_content[start:end].strip()
+    print(f"[DEBUG] Extracted section 'projects':\n{section_text[:500]}\n---END SECTION---")
+    return section_text
 
 def parse_cv_sections(cv_content: str) -> dict:
     """Parse CV content to identify sections and their positions"""
@@ -1607,6 +1615,13 @@ async def upload_cv(file: UploadFile = File(...)):
                 print("✅ CV content verified in database - chat system will have full access")
             else:
                 print("⚠️ Warning: CV might not be properly stored")
+            
+            # Extract and insert projects from CV
+            extracted_projects = extract_projects_from_cv(stored_cv[0])
+            print(f"🔍 Extracted {len(extracted_projects)} projects from CV.")
+            for project in extracted_projects:
+                cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", (json.dumps(project),))
+            print(f"✅ Inserted {len(extracted_projects)} projects into manual_projects table.")
         
         return JSONResponse(status_code=200, content={
             "message": f"✅ CV uploaded successfully! Chat system now has full access to your {len(cv_text)} character CV content.", 
@@ -2635,7 +2650,7 @@ Create an engaging LinkedIn post that:
 Make it sound personal and authentic, as if the developer is sharing their experience."""
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=500
@@ -2918,7 +2933,7 @@ Please format the CV with:
 Return only the formatted CV content, no additional commentary."""
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2000

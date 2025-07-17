@@ -16,16 +16,16 @@ def test_openai_connection():
     print("=" * 50)
     
     # Check environment variable
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("VITE_OPENAI_API_KEY")
     if not api_key:
-        print("❌ OPENAI_API_KEY environment variable not set")
+        print("❌ VITE_OPENAI_API_KEY environment variable not set")
         return False
     
     if not api_key.startswith('sk-'):
-        print("❌ OPENAI_API_KEY format is invalid (should start with 'sk-')")
+        print("❌ VITE_OPENAI_API_KEY format is invalid (should start with 'sk-')")
         return False
     
-    print(f"✅ OPENAI_API_KEY found: {api_key[:10]}...{api_key[-4:]}")
+    print(f"✅ VITE_OPENAI_API_KEY found: {api_key[:10]}...{api_key[-4:]}")
     
     # Test OpenAI client
     try:
@@ -58,7 +58,7 @@ def test_linkedin_blog_generation():
         from openai import OpenAI
         import os
         
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("VITE_OPENAI_API_KEY")
         if not api_key:
             print("❌ No OpenAI API key available")
             return False

@@ -553,11 +553,6 @@ function CVManagementPage() {
     });
   };
 
-  const truncateContent = (content, maxLength = 200) => {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
-  };
-
   return (
     <PageContainer>
       <ContentWrapper>

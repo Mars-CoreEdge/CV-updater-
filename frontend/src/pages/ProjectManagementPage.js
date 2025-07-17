@@ -734,43 +734,6 @@ function ProjectManagementPage() {
     }
   };
 
-  const extractProjectFromMessage = (message) => {
-    // Enhanced project extraction logic (unchanged from previous implementation)
-    const project = {
-      title: '',
-      description: '',
-      technologies: [],
-      duration: '',
-      achievements: []
-    };
-
-    // Extract technologies
-    const techKeywords = [
-      'react', 'vue', 'angular', 'javascript', 'typescript',
-      'node', 'express', 'python', 'django', 'flask',
-      'mongodb', 'mysql', 'postgresql', 'sqlite'
-    ];
-
-    const foundTech = techKeywords.filter(tech =>
-      message.toLowerCase().includes(tech)
-    );
-
-    project.technologies = foundTech.map(tech => tech.charAt(0).toUpperCase() + tech.slice(1));
-
-    // Basic title extraction
-    if (message.toLowerCase().includes('website')) {
-      project.title = 'Website Project';
-    } else if (message.toLowerCase().includes('app')) {
-      project.title = 'Application Project';
-    } else {
-      project.title = 'New Project';
-    }
-
-    project.description = `A project involving ${project.technologies.join(', ') || 'modern technologies'}`;
-
-    return project;
-  };
-
   const extractProjectNumber = (message) => {
     const match = message.match(/(\d+)/);
     return match ? parseInt(match[1]) : null;
@@ -842,7 +805,7 @@ function ProjectManagementPage() {
       if (editingProject) {
         await axios.put(`${API_BASE_URL}/projects/${editingProject.id}`, projectData);
       } else {
-        await axios.post(`${API_BASE_URL}/projects/`, projectData);
+        await axios.post(`${API_BASE_URL}/projects/create`, projectData);
       }
 
       await loadProjects();

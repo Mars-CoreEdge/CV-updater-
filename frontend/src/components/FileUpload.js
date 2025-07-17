@@ -25,6 +25,13 @@ try {
 const UploadContainer = styled.div`
   text-align: center;
   position: relative;
+  /* Remove all blurry effects */
+  backdrop-filter: none !important;
+  filter: none !important;
+  &:hover {
+    backdrop-filter: none !important;
+    filter: none !important;
+  }
 `;
 
 const Title = styled.h2`
@@ -56,41 +63,26 @@ const DropZone = styled.div`
     'linear-gradient(135deg, #f8f9fa, #ffffff)'
   };
   cursor: pointer;
-  transition: var(--transition-smooth);
+  transition: none;
   position: relative;
   overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
-    transition: var(--transition-smooth);
-  }
-  
+  /* Remove hover and animation */
   &:hover {
     border-color: var(--primary-color);
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    /* No transform or box-shadow */
   }
-  
-  &:hover::before {
-    left: 100%;
+  &::before, &:hover::before {
+    transition: none;
+    left: -100%;
   }
-  
-  ${props => props.isDragOver && `
-    animation: bounceIn 0.3s ease-out;
-    
-    @keyframes bounceIn {
-      0% { transform: scale(0.95); }
-      50% { transform: scale(1.02); }
-      100% { transform: scale(1); }
-    }
-  `}
+  ${props => props.isDragOver && ''}
+  backdrop-filter: none !important;
+  filter: none !important;
+  &:hover {
+    backdrop-filter: none !important;
+    filter: none !important;
+  }
 `;
 
 const UploadIcon = styled.div`
@@ -100,10 +92,10 @@ const UploadIcon = styled.div`
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  transition: var(--transition-smooth);
-  
+  transition: none;
+  /* Remove scale on hover */
   ${DropZone}:hover & {
-    transform: scale(1.1);
+    transform: none;
   }
 `;
 
@@ -140,7 +132,6 @@ const FormatBadge = styled.span`
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 500;
-  box-shadow: var(--shadow-sm);
 `;
 
 const FileInfo = styled.div`
@@ -195,7 +186,6 @@ const Button = styled.button`
   font-size: 1rem;
   font-weight: 600;
   transition: var(--transition-smooth);
-  box-shadow: var(--shadow-md);
   position: relative;
   overflow: hidden;
   
@@ -212,7 +202,6 @@ const Button = styled.button`
   
   &:hover:not(:disabled) {
     transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
   }
   
   &:hover:not(:disabled)::before {
@@ -245,24 +234,6 @@ const SuccessMessage = styled.div`
   margin-top: 20px;
   border-left: 4px solid #28a745;
   animation: fadeInScale 0.5s ease-out;
-  box-shadow: var(--shadow-sm);
-  
-  .success-icon {
-    font-size: 1.5rem;
-    margin-bottom: 8px;
-    display: block;
-  }
-  
-  @keyframes fadeInScale {
-    from {
-      opacity: 0;
-      transform: scale(0.8);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
 `;
 
 const ErrorMessage = styled.div`
@@ -273,19 +244,6 @@ const ErrorMessage = styled.div`
   margin-top: 20px;
   border-left: 4px solid #dc3545;
   animation: shakeError 0.5s ease-out;
-  box-shadow: var(--shadow-sm);
-  
-  .error-icon {
-    font-size: 1.5rem;
-    margin-bottom: 8px;
-    display: block;
-  }
-  
-  @keyframes shakeError {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
-  }
 `;
 
 const LoadingSpinner = styled.div`
@@ -542,7 +500,7 @@ function FileUpload({ onFileUploaded }) {
       return finalText;
       
     } catch (error) {
-      console.error('PDF extraction error:', error);
+      console.info('Frontend PDF extraction failed, but backend will handle extraction. This is normal for some files.');
       
       if (error.message.includes('Invalid PDF')) {
         throw new Error('Invalid PDF file. Please check the file and try again.');

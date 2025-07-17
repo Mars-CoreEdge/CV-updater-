@@ -13,7 +13,7 @@ def setup_openai_key():
     print("=" * 50)
     
     # Check if key already exists
-    existing_key = os.getenv("OPENAI_API_KEY")
+    existing_key = os.getenv("VITE_OPENAI_API_KEY")
     if existing_key:
         print(f"✅ OpenAI API key already set: {existing_key[:10]}...{existing_key[-4:]}")
         return True
@@ -38,13 +38,13 @@ def setup_openai_key():
         return False
     
     # Set environment variable for current session
-    os.environ["OPENAI_API_KEY"] = api_key
+    os.environ["VITE_OPENAI_API_KEY"] = api_key
     print(f"✅ API key set for current session: {api_key[:10]}...{api_key[-4:]}")
     
     # Create .env file for future sessions
     try:
         with open('backend/.env', 'w') as f:
-            f.write(f"OPENAI_API_KEY={api_key}\n")
+            f.write(f"VITE_OPENAI_API_KEY={api_key}\n")
         print("✅ Created backend/.env file for persistent storage")
     except Exception as e:
         print(f"⚠️ Could not create .env file: {e}")
@@ -61,7 +61,7 @@ def test_openai_functionality():
     try:
         from openai import OpenAI
         
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("VITE_OPENAI_API_KEY")
         if not api_key:
             print("❌ No API key available")
             return False

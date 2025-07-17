@@ -694,30 +694,6 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
     }
   }, [cvUploaded]);
 
-  // Fallback mechanism: periodically trigger CV refresh after chat activity
-  useEffect(() => {
-    if (!cvUploaded || messages.length === 0) return;
-
-    const interval = setInterval(() => {
-      const timeSinceLastUpdate = Date.now() - lastUpdateCheck;
-      
-      // If there's been recent chat activity (messages in last 10 seconds), trigger a CV refresh
-      const recentMessages = messages.filter(msg => 
-        Date.now() - new Date(msg.timestamp).getTime() < 10000
-      );
-      
-      if (recentMessages.length > 0 && timeSinceLastUpdate > 3000) {
-        console.log('🔄 Fallback CV refresh triggered due to recent chat activity');
-        if (onCVUpdate) {
-          onCVUpdate(true);
-        }
-        setLastUpdateCheck(Date.now());
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [cvUploaded, messages, lastUpdateCheck, onCVUpdate]);
-
   const loadChatHistory = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/chat/history/`);

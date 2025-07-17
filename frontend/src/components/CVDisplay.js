@@ -13,6 +13,8 @@ const CVContainer = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  height: 1040px;
+  overflow-y: auto;
 `;
 
 const Header = styled.div`
@@ -52,7 +54,8 @@ const Title = styled.h2`
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: iconFloat 3s ease-in-out infinite;
+    /* Remove animation */
+    animation: none;
   }
   
   @keyframes iconFloat {
@@ -222,7 +225,6 @@ const CVContent = styled.div`
   
   h1 {
     font-size: 2.2rem;
-    border-bottom: 3px solid var(--primary-color);
     padding-bottom: 12px;
     margin-bottom: 1.2em;
     text-align: center;
@@ -232,7 +234,6 @@ const CVContent = styled.div`
   h2 {
     font-size: 1.4rem;
     color: var(--primary-color);
-    border-bottom: 2px solid rgba(102, 126, 234, 0.3);
     padding-bottom: 6px;
     margin-top: 2em;
   }
@@ -277,10 +278,7 @@ const CVContent = styled.div`
   
   /* Section dividers */
   hr {
-    border: none;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
-    margin: 2em 0;
+    display: none !important;
   }
   
   /* Improve spacing for better readability */
@@ -343,7 +341,8 @@ const PlaceholderMessage = styled.div`
     margin-bottom: 20px;
     display: block;
     opacity: 0.6;
-    animation: float 3s ease-in-out infinite;
+    /* Remove animation */
+    animation: none;
   }
   
   .placeholder-title {
@@ -516,13 +515,12 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
   const [cvData, setCvData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { user } = useAuth();
 
   useEffect(() => {
     if (cvUploaded) {
       loadCV();
     }
-  }, [cvUploaded, refreshTrigger]);
+  }, [cvUploaded]);
 
   const formatCVContent = (content) => {
     if (!content) return '';
@@ -678,7 +676,6 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
       const content = cvData.content;
       const lines = content.split('\n');
       
-      let currentSection = '';
       let isFirstLine = true;
       
       for (let i = 0; i < lines.length; i++) {
@@ -715,7 +712,6 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
           yPosition += 3;
         } else if (isHeader) {
           addSectionHeader(line);
-          currentSection = line.toLowerCase();
         } else {
           // Regular content
           let fontSize = 11;
@@ -753,9 +749,7 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
       }
       
       // Download the PDF
-      const filename = cvData.filename ? 
-        `Enhanced_${cvData.filename.replace(/\.[^/.]+$/, '')}_${new Date().toISOString().split('T')[0]}.pdf` : 
-        `Enhanced_CV_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = cvData.filename ? `Enhanced_${cvData.filename.replace(/\.[^/.]+$/, '')}_${new Date().toISOString().split('T')[0]}.pdf` : `Enhanced_CV_${new Date().toISOString().split('T')[0]}.pdf`;
       
       pdf.save(filename);
       

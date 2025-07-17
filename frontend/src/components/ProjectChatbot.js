@@ -274,26 +274,6 @@ const ActionButton = styled.button`
   }
 `;
 
-const DownloadButton = styled.a`
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #28a745, #20c997);
-  color: white;
-  text-decoration: none;
-  padding: 10px 16px;
-  border-radius: 15px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  margin-top: 10px;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
-  }
-`;
-
 const BlogPostContainer = styled.div`
   background: rgba(0, 119, 181, 0.05);
   border: 1px solid rgba(0, 119, 181, 0.2);
@@ -511,9 +491,9 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
       
       // Extract project title
       const titlePatterns = [
-        /(?:built|created|developed|made|worked on) (?:a |an |the )?([^,\.]+?)(?:\s+using|\s+with|\s+in|$)/i,
-        /project called ([^,\.]+)/i,
-        /(?:built|created|developed|made) ([^,\.]+)/i
+        /(?:built|created|developed|made|worked on) (?:a |an |the )?([^,.]+?)(?:\s+using|\s+with|\s+in|$)/i,
+        /project called ([^,.]+)/i,
+        /(?:built|created|developed|made) ([^,.]+)/i
       ];
       
       for (const pattern of titlePatterns) {
@@ -526,9 +506,9 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
       
       // Extract technologies
       const techPatterns = [
-        /using ([^,\.]+)/gi,
-        /with ([^,\.]+)/gi,
-        /in ([^,\.]+)/gi
+        /using ([^,.]+)/gi,
+        /with ([^,.]+)/gi,
+        /in ([^,.]+)/gi
       ];
       
       const techSet = new Set();
@@ -698,7 +678,7 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
               const projectData = await extractProjectFromMessage(message);
               
               if (projectData) {
-                const response = await axios.post('http://localhost:8000/projects/', projectData);
+                const response = await axios.post('http://localhost:8000/projects/create', projectData);
                 
                 if (response.data && response.data.message === "Project created successfully") {
                   // Reload projects to get fresh data with IDs
@@ -911,8 +891,37 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
                 <ActionButton 
                   key={index} 
                   onClick={() => {
-                    setInputValue(action);
-                    setTimeout(handleSend, 100);
+                    if (action === "Create LinkedIn blog") {
+                      let projectName = extractProjectName(inputValue);
+                      if (!projectName && projects && projects.length > 0) {
+                        projectName = projects[0].title;
+                      }
+                      if (!projectName) {
+                        addMessage("📝 Please tell me which project you'd like to create a LinkedIn blog about.");
+                        setInputValue(""); // Clear input
+                      } else {
+                        simulateTyping(2000);
+                        setTimeout(async () => {
+                          const result = await handleGenerateBlog(projectName);
+                          if (result.success) {
+                            addMessage(
+                              `📝 LinkedIn Blog Post for "${result.projectTitle}"`, 
+                              false, 
+                              true, 
+                              {
+                                blog: result.blog,
+                                projectTitle: result.projectTitle
+                              }
+                            );
+                          } else {
+                            addMessage(result.message);
+                          }
+                        }, 2000);
+                      }
+                    } else {
+                      setInputValue(action);
+                      setTimeout(handleSend, 100);
+                    }
                   }}
                 >
                   {action}

@@ -11,9 +11,9 @@ except ImportError as e:
     exit(1)
 
 # Test API key
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("VITE_OPENAI_API_KEY")
 if not api_key:
-    print("❌ OPENAI_API_KEY environment variable not set")
+    print("❌ VITE_OPENAI_API_KEY environment variable not set")
     exit(1)
 
 print(f"API Key: {api_key[:25]}..." if api_key else "❌ No API Key")

@@ -274,7 +274,7 @@ def main():
             
         if not blog_working:
             print("\n🔧 LINKEDIN BLOG ISSUE FIXES:")
-            print("1. Ensure OpenAI API key is set (OPENAI_API_KEY environment variable)")
+            print("1. Ensure OpenAI API key is set (VITE_OPENAI_API_KEY environment variable)")
             print("2. Check if projects exist before generating blogs")
             print("3. Verify blog generation endpoints are working")
             
