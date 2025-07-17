@@ -73,7 +73,6 @@
   --transition-spring: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   --transition-bounce: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   --transition-enterprise: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --transition-professional: all 0.35s cubic-bezier(0.23, 1, 0.32, 1);
   
   /* Professional Spacing System */
   --spacing-xs: 4px;
@@ -301,7 +300,7 @@ code {
 }
 
 .fade-in-scale {
-  animation: fadeInScale 0.6s var(--transition-professional);
+  animation: fadeInScale 0.6s var(--transition-smooth);
 }
 
 .scale-in {
@@ -309,11 +308,11 @@ code {
 }
 
 .slide-in-right {
-  animation: slideInRight 0.8s var(--transition-professional);
+  animation: slideInRight 0.8s var(--transition-smooth);
 }
 
 .slide-in-left {
-  animation: slideInLeft 0.8s var(--transition-professional);
+  animation: slideInLeft 0.8s var(--transition-smooth);
 }
 
 .slide-in-rotate {
@@ -414,7 +413,7 @@ input, textarea, select {
   border-radius: var(--border-radius-2xl);
   box-shadow: var(--shadow-professional);
   border: 1px solid rgba(102, 126, 234, 0.08);
-  transition: var(--transition-professional);
+  transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
 }
@@ -426,9 +425,9 @@ input, textarea, select {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--primary-gradient);
-  transition: var(--transition-professional);
-  opacity: 0.7;
+      background: var(--primary-gradient);
+    transition: var(--transition-smooth);
+    opacity: 0.7;
 }
 
 .modern-card::after {
@@ -441,9 +440,9 @@ input, textarea, select {
   background: linear-gradient(135deg, 
     rgba(102, 126, 234, 0.02) 0%, 
     rgba(118, 75, 162, 0.01) 100%);
-  opacity: 0;
-  transition: var(--transition-professional);
-  pointer-events: none;
+      opacity: 0;
+    transition: var(--transition-smooth);
+    pointer-events: none;
 }
 
 .modern-card:hover {

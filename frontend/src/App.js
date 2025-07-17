@@ -241,7 +241,7 @@ const ContentWrapper = styled.div`
 const Header = styled.header`
   text-align: center;
   margin-bottom: var(--spacing-3xl);
-  animation: fadeInDown 1s var(--transition-professional);
+  animation: fadeInDown 1s var(--transition-smooth);
 `;
 
 const Title = styled.h1`
@@ -303,7 +303,7 @@ const Subtitle = styled.p`
   letter-spacing: -0.015em;
   text-align: center;
   opacity: 0.9;
-  animation: fadeInUp 1.2s var(--transition-professional) 0.3s both;
+  animation: fadeInUp 1.2s var(--transition-smooth) 0.3s both;
   
   @media (max-width: 768px) {
     font-size: 1.125rem;
@@ -317,7 +317,7 @@ const StatsBar = styled.div`
   justify-content: center;
   gap: var(--spacing-xl);
   margin-bottom: var(--spacing-2xl);
-  animation: fadeInScale 1s var(--transition-professional) 0.6s both;
+  animation: fadeInScale 1s var(--transition-smooth) 0.6s both;
   
   @media (max-width: 768px) {
     gap: var(--spacing-lg);
@@ -335,7 +335,7 @@ const StatItem = styled.div`
   color: ${props => props.theme.colors.textPrimary};
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  transition: var(--transition-professional);
+  transition: var(--transition-smooth);
   box-shadow: 0 4px 20px ${props => props.theme.colors.shadow};
   position: relative;
   overflow: hidden;
@@ -350,7 +350,7 @@ const StatItem = styled.div`
     height: 2px;
     background: var(--accent-gradient);
     transform: scaleX(0);
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
     box-shadow: 0 0 10px rgba(79, 172, 254, 0.3);
   }
   
@@ -365,7 +365,7 @@ const StatItem = styled.div`
       rgba(102, 126, 234, 0.02) 0%, 
       rgba(79, 172, 254, 0.01) 100%);
     opacity: 0;
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
     pointer-events: none;
   }
   
@@ -408,7 +408,7 @@ const MainContent = styled.div`
   width: 100%;
   margin: 0 auto;
   overflow: hidden;
-  animation: fadeInScale 1.2s var(--transition-professional) 0.8s both;
+  animation: fadeInScale 1.2s var(--transition-smooth) 0.8s both;
   
   @media (max-width: 1200px) {
     gap: var(--spacing-xl);
@@ -427,7 +427,7 @@ const LeftPanel = styled.div`
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
-  animation: slideInLeft 1s var(--transition-professional) 0.9s both;
+  animation: slideInLeft 1s var(--transition-smooth) 0.9s both;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -441,7 +441,7 @@ const LeftPanel = styled.div`
 const RightPanel = styled.div`
   display: flex;
   flex-direction: column;
-  animation: slideInRight 1s var(--transition-professional) 1s both;
+  animation: slideInRight 1s var(--transition-smooth) 1s both;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -458,7 +458,7 @@ const NavButton = styled.button`
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   margin-bottom: var(--spacing-lg);
-  transition: var(--transition-professional);
+  transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow-professional);
@@ -475,7 +475,7 @@ const NavButton = styled.button`
     bottom: 0;
     background: var(--professional-gradient);
     opacity: 0;
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
     z-index: -1;
   }
   
@@ -487,7 +487,7 @@ const NavButton = styled.button`
     right: 0;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
   }
   
   /* Removed hover effect from NavButton */
@@ -518,7 +518,7 @@ const NavButton = styled.button`
   }
   .icon {
     font-size: 1.3rem;
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
     filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.1));
   }
   /* &:hover .icon {
@@ -557,7 +557,7 @@ const ModernCard = styled.div`
   border: 1px solid rgba(102, 126, 234, 0.06);
   position: relative;
   overflow: hidden;
-  transition: var(--transition-professional);
+  transition: var(--transition-smooth);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -570,7 +570,7 @@ const ModernCard = styled.div`
     right: 0;
     height: 2px;
     background: var(--professional-gradient);
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
     opacity: 0.8;
     box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
   }
@@ -586,7 +586,7 @@ const ModernCard = styled.div`
       radial-gradient(circle at top left, rgba(102, 126, 234, 0.015) 0%, transparent 50%),
       radial-gradient(circle at bottom right, rgba(118, 75, 162, 0.015) 0%, transparent 50%);
     opacity: 0;
-    transition: var(--transition-professional);
+    transition: var(--transition-smooth);
     pointer-events: none;
     z-index: 0;
   }
@@ -672,9 +672,9 @@ const ConnectionIndicator = styled.div`
   color: ${props => props.theme.colors.textPrimary};
   border: 1px solid ${props => props.theme.colors.border};
   z-index: 998;
-  animation: fadeInScale 1s var(--transition-professional) 1.5s both;
+  animation: fadeInScale 1s var(--transition-smooth) 1.5s both;
   box-shadow: 0 4px 20px ${props => props.theme.colors.shadow};
-  transition: var(--transition-professional);
+  transition: var(--transition-smooth);
   letter-spacing: -0.01em;
   
   &:hover {
@@ -870,7 +870,7 @@ function CVUpdaterContent() {
                 )}
               </NavigationPanel>
               
-              <ModernCard style={{height: 'fit-content'}}>
+              <ModernCard style={{height: '100%'}}>
                 <CVDisplay 
                   cvUploaded={cvUploaded} 
                 />

@@ -835,6 +835,8 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  // Quick actions suggestions - commented out as requested
+  /*
   const quickActions = [
     { text: '📖 Show Skills', message: 'show my skills' },
     { text: '💼 Show Experience', message: 'show my experience' },
@@ -849,6 +851,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
     { text: '📋 Generate CV', message: 'generate cv' },
     { text: '❓ Help', message: 'help' }
   ];
+  */
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -888,6 +891,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
             </div>
           </GenerateCVButton>
           
+          {/* Quick actions suggestions - commented out as requested
           <QuickActionsContainer>
             <RefreshCVButton
               onClick={handleManualCVRefresh}
@@ -910,6 +914,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
               </QuickActionButton>
             ))}
           </QuickActionsContainer>
+          */}
         </>
       )}
       
