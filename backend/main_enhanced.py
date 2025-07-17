@@ -2068,37 +2068,32 @@ async def chat(request: ChatRequest):
                 response_text = "📄 Please upload a CV first so I can perform operations on your CV content!"
             
             # ===== CREATE OPERATIONS =====
-            elif category in ["SKILL_ADD", "EXPERIENCE_ADD", "EDUCATION_ADD", "PROJECT_ADD", "CONTACT_ADD"]:
+            elif category in ["SKILL_ADD", "EXPERIENCE_ADD", "EDUCATION_ADD", "PROJECT_ADD", "PROFILE_ADD", "CONTACT_ADD"]:
                 if cv_content:
                     section_map = {
                         "SKILL_ADD": "skills",
-                        "EXPERIENCE_ADD": "experience", 
+                        "EXPERIENCE_ADD": "experience",
                         "EDUCATION_ADD": "education",
                         "PROJECT_ADD": "projects",
+                        "PROFILE_ADD": "profile",
                         "CONTACT_ADD": "contact"
                     }
                     section_type = section_map.get(category, "skills")
-                    if category == "EDUCATION_ADD":
-                        print(f"[DIAG] Incoming EDUCATION_ADD. Extracted info: {extracted_info}")
-                        print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find('education'):][:500]}")
-                        updated_cv = insert_content_in_section_enhanced(cv_content, "education", extracted_info, "append")
-                        print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find('education'):][:500]}")
-                        if updated_cv != cv_content:
-                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-                            cv_updated = True
-                            print(f"[DIAG] DB updated with new education section.")
-                            # Extract and return the updated education section
-                            education_section = extract_section_from_cv(updated_cv, 'education')
-                            response_text = f"✅ Added to education section! Your CV has been updated.\n\n**Updated Education Section:**\n{education_section}"
-                        else:
-                            print(f"[DIAG] No changes made to education section.")
-                            response_text = "⚠️ No changes made to your education section."
+                    # Use robust insertion for all major sections
+                    print(f"[DIAG] Incoming {category}. Extracted info: {extracted_info}")
+                    print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find(section_type):][:500] if section_type in cv_content.lower() else cv_content[:500]}")
+                    updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_info, "append")
+                    print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
+                    if updated_cv != cv_content:
+                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                        cv_updated = True
+                        print(f"[DIAG] DB updated with new {section_type} section.")
+                        # Extract and return the updated section
+                        updated_section = extract_section_from_cv(updated_cv, section_type)
+                        response_text = f"✅ Added to {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
                     else:
-                        updated_cv, response_text = create_cv_item(cv_content, section_type, extracted_info)
-                        if updated_cv != cv_content:
-                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-                            cv_updated = True
-                            response_text += f" Your CV has been automatically updated and the changes are now visible."
+                        print(f"[DIAG] No changes made to {section_type} section.")
+                        response_text = f"⚠️ No changes made to your {section_type} section."
                     if category == "PROJECT_ADD":
                         try:
                             project_data = extract_project_from_message(extracted_info)
@@ -2137,36 +2132,30 @@ async def chat(request: ChatRequest):
                                 response_text += f"... and {len(projects) - 3} more projects"
             
             # ===== UPDATE OPERATIONS =====
-            elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE", "PROJECT_UPDATE", "CONTACT_UPDATE"]:
+            elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE", "PROJECT_UPDATE", "PROFILE_UPDATE", "CONTACT_UPDATE"]:
                 if cv_content:
                     section_map = {
                         "SKILL_UPDATE": "skills",
                         "EXPERIENCE_UPDATE": "experience",
-                        "EDUCATION_UPDATE": "education", 
+                        "EDUCATION_UPDATE": "education",
                         "PROJECT_UPDATE": "projects",
+                        "PROFILE_UPDATE": "profile",
                         "CONTACT_UPDATE": "contact"
                     }
                     section_type = section_map.get(category, "skills")
-                    if category == "EDUCATION_UPDATE":
-                        print(f"[DIAG] Incoming EDUCATION_UPDATE. Extracted info: {extracted_info}")
-                        print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find('education'):][:500]}")
-                        updated_cv = insert_content_in_section_enhanced(cv_content, "education", extracted_info, "append")
-                        print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find('education'):][:500]}")
-                        if updated_cv != cv_content:
-                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-                            cv_updated = True
-                            print(f"[DIAG] DB updated with new education section.")
-                            education_section = extract_section_from_cv(updated_cv, 'education')
-                            response_text = f"✅ Updated education section! Your CV has been updated.\n\n**Updated Education Section:**\n{education_section}"
-                        else:
-                            print(f"[DIAG] No changes made to education section.")
-                            response_text = "⚠️ No changes made to your education section."
+                    print(f"[DIAG] Incoming {category}. Extracted info: {extracted_info}")
+                    print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find(section_type):][:500] if section_type in cv_content.lower() else cv_content[:500]}")
+                    updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_info, "append")
+                    print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
+                    if updated_cv != cv_content:
+                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                        cv_updated = True
+                        print(f"[DIAG] DB updated with new {section_type} section.")
+                        updated_section = extract_section_from_cv(updated_cv, section_type)
+                        response_text = f"✅ Updated {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
                     else:
-                        updated_cv, response_text = update_cv_item(cv_content, section_type, extracted_info)
-                        if updated_cv != cv_content:
-                            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-                            cv_updated = True
-                            response_text += f" The changes are now visible in your CV."
+                        print(f"[DIAG] No changes made to {section_type} section.")
+                        response_text = f"⚠️ No changes made to your {section_type} section."
             
             # ===== DELETE OPERATIONS =====
             elif category in ["SKILL_DELETE", "EXPERIENCE_DELETE", "EDUCATION_DELETE", "PROJECT_DELETE", "CONTACT_DELETE"]:
