@@ -182,7 +182,7 @@ const CVContent = styled.div`
   width: 100%;
   max-width: 100%;
   position: relative;
-  min-height: 500px;
+  // min-height: 500px;
   
   @media (max-width: 1200px) {
     padding: 25px;

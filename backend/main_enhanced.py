@@ -1787,40 +1787,51 @@ def parse_cv_sections(cv_content: str) -> dict:
     sections = {}
     cv_lines = cv_content.split('\n')
     
-    # Common section headers patterns
+    # Enhanced section headers patterns to handle various formats
     section_patterns = {
+        'profile': [
+            r'^\s*PROFILE\s+SUMMARY\s*$', r'^\s*PROFILE\s*$', r'^\s*SUMMARY\s*$', r'^\s*ABOUT\s+ME\s*$',
+            r'^\s*OBJECTIVE\s*$', r'^\s*PROFESSIONAL\s+SUMMARY\s*$', r'^\s*CAREER\s+OBJECTIVE\s*$',
+            r'^\s*_+\s*PROFILE\s+SUMMARY\s*_+\s*$', r'^\s*_+\s*PROFILE\s*_+\s*$'
+        ],
         'skills': [
             r'^\s*SKILLS?\s*$', r'^\s*TECHNICAL\s+SKILLS?\s*$', r'^\s*CORE\s+COMPETENCIES\s*$',
-            r'^\s*TECHNOLOGIES\s*$', r'^\s*TECHNICAL\s+COMPETENCIES\s*$'
+            r'^\s*TECHNOLOGIES\s*$', r'^\s*TECHNICAL\s+COMPETENCIES\s*$', r'^\s*PROFESSIONAL\s+SKILLS?\s*$',
+            r'^\s*_+\s*SKILLS?\s*_+\s*$', r'^\s*_+\s*TECHNICAL\s+SKILLS?\s*_+\s*$'
         ],
         'experience': [
             r'^\s*WORK\s+EXPERIENCE\s*$', r'^\s*EXPERIENCE\s*$', r'^\s*PROFESSIONAL\s+EXPERIENCE\s*$',
-            r'^\s*EMPLOYMENT\s+HISTORY\s*$', r'^\s*CAREER\s+HISTORY\s*$'
+            r'^\s*EMPLOYMENT\s+HISTORY\s*$', r'^\s*CAREER\s+HISTORY\s*$', r'^\s*WORK\s+HISTORY\s*$',
+            r'^\s*_+\s*WORK\s+EXPERIENCE\s*_+\s*$', r'^\s*_+\s*EXPERIENCE\s*_+\s*$'
         ],
         'education': [
             r'^\s*EDUCATION\s*$', r'^\s*EDUCATIONAL\s+BACKGROUND\s*$', r'^\s*ACADEMIC\s+BACKGROUND\s*$',
-            r'^\s*QUALIFICATIONS\s*$', r'^\s*ACADEMIC\s+QUALIFICATIONS\s*$'
+            r'^\s*QUALIFICATIONS\s*$', r'^\s*ACADEMIC\s+QUALIFICATIONS\s*$', r'^\s*DEGREES\s*$',
+            r'^\s*_+\s*EDUCATION\s*_+\s*$', r'^\s*_+\s*EDUCATIONAL\s+BACKGROUND\s*_+\s*$'
         ],
         'projects': [
             r'^\s*PROJECTS?\s*$', r'^\s*KEY\s+PROJECTS?\s*$', r'^\s*NOTABLE\s+PROJECTS?\s*$',
             r'^\s*PERSONAL\s+PROJECTS?\s*$', r'^\s*PORTFOLIO\s*$', r'^\s*SELECTED\s+PROJECTS?\s*$',
-            r'^\s*MAJOR\s+PROJECTS?\s*$', r'^\s*PROJECT\s+EXPERIENCE\s*$', r'^\s*PROFESSIONAL\s+PROJECTS?\s*$'
+            r'^\s*MAJOR\s+PROJECTS?\s*$', r'^\s*PROJECT\s+EXPERIENCE\s*$', r'^\s*PROFESSIONAL\s+PROJECTS?\s*$',
+            r'^\s*_+\s*PROJECTS?\s*_+\s*$'
         ]
     }
     
     for i, line in enumerate(cv_lines):
         line_upper = line.upper().strip()
         
-        # Check for section headers
+        # Check for section headers with enhanced pattern matching
         for section_type, patterns in section_patterns.items():
             for pattern in patterns:
-                if re.match(pattern, line_upper):
+                if re.match(pattern, line_upper, re.IGNORECASE):
                     sections[section_type] = {
                         'start_line': i,
                         'header': line.strip(),
                         'content_start': i + 1
                     }
                     break
+            if section_type in sections:
+                break
     
     # Find section end positions
     section_names = list(sections.keys())
@@ -2336,7 +2347,10 @@ async def get_current_cv():
 def format_cv_for_display(cv_content: str) -> str:
     """Format CV content for clean display in the frontend"""
     try:
-        lines = cv_content.strip().split('\n')
+        # First, reorganize the CV content to ensure proper section placement
+        reorganized_cv = reorganize_cv_content(cv_content)
+        
+        lines = reorganized_cv.strip().split('\n')
         formatted_lines = []
         
         for line in lines:
@@ -2345,20 +2359,24 @@ def format_cv_for_display(cv_content: str) -> str:
                 formatted_lines.append("")
                 continue
             
-            # Check if this is a section header (all caps or contains common section keywords)
+            # Check if this is a section header (with underscores or all caps)
             is_header = (
-                line.isupper() and len(line) > 3 or
-                any(keyword in line.upper() for keyword in 
+                ('_____' in line and any(keyword in line.upper() for keyword in 
                     ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 
-                     'PROJECTS', 'ACHIEVEMENTS', 'CERTIFICATIONS', 'CONTACT'])
+                     'PROJECTS', 'ACHIEVEMENTS', 'CERTIFICATIONS', 'CONTACT'])) or
+                (line.isupper() and len(line) > 3 and any(keyword in line.upper() for keyword in 
+                    ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 
+                     'PROJECTS', 'ACHIEVEMENTS', 'CERTIFICATIONS', 'CONTACT']))
             )
             
             if is_header:
                 # Add some spacing before section headers
                 if formatted_lines and formatted_lines[-1] != "":
                     formatted_lines.append("")
-                formatted_lines.append(f"📋 {line}")
-                formatted_lines.append("─" * (len(line) + 5))  # Add underline
+                # Clean up the header (remove underscores, format nicely)
+                clean_header = line.replace('_', '').strip()
+                formatted_lines.append(f"📋 {clean_header}")
+                formatted_lines.append("─" * (len(clean_header) + 5))  # Add underline
             else:
                 # Clean up bullet points and formatting
                 if line.startswith('•') or line.startswith('-') or line.startswith('*'):
@@ -3213,19 +3231,25 @@ def generate_cv_text_from_data(cv_data: dict) -> str:
     if technical_skills or professional_skills:
         cv_text += f"\n_____________________________ SKILLS _____________________________\n"
         if technical_skills:
-            cv_text += f"Technical Skills: {' | '.join(technical_skills)}\n"
+            cv_text += f"Technical Skills:\n"
+            for skill in technical_skills:
+                cv_text += f"• {skill}\n"
         if professional_skills:
-            cv_text += f"Professional Skills: {' | '.join(professional_skills)}\n"
+            cv_text += f"Professional Skills:\n"
+            for skill in professional_skills:
+                cv_text += f"• {skill}\n"
     
     # Work Experience
     experience = cv_data.get('experience', [])
     if experience:
         cv_text += f"\n_____________________________ WORK EXPERIENCE _____________________________\n"
         for exp in experience:
-            cv_text += f"{exp.get('job_title', '')} {exp.get('company', '')} | {exp.get('duration', '')}\n"
+            cv_text += f"{exp.get('job_title', '')} at {exp.get('company', '')}\n"
+            cv_text += f"Duration: {exp.get('duration', '')}\n"
             if exp.get('description'):
-                cv_text += f"{exp.get('description')}\n"
+                cv_text += f"Description: {exp.get('description')}\n"
             if exp.get('achievements'):
+                cv_text += f"Achievements:\n"
                 for achievement in exp.get('achievements', []):
                     cv_text += f"• {achievement}\n"
             cv_text += "\n"
@@ -3233,20 +3257,20 @@ def generate_cv_text_from_data(cv_data: dict) -> str:
     # Education
     education = cv_data.get('education', [])
     if education:
-        cv_text += f"_____________________________ EDUCATION _____________________________\n"
+        cv_text += f"\n_____________________________ EDUCATION _____________________________\n"
         for edu in education:
             cv_text += f"{edu.get('degree', '')}"
             if edu.get('grade'):
-                cv_text += f" {edu.get('grade')}"
-            cv_text += f", from {edu.get('institution', '')}"
+                cv_text += f" - {edu.get('grade')}"
+            cv_text += f"\nInstitution: {edu.get('institution', '')}"
             if edu.get('year'):
                 cv_text += f" ({edu.get('year')})"
-            cv_text += "\n"
+            cv_text += "\n\n"
     
     # Projects
     projects = cv_data.get('projects', [])
     if projects:
-        cv_text += f"\nPROJECTS\n"
+        cv_text += f"\n_____________________________ PROJECTS _____________________________\n"
         for i, project in enumerate(projects, 1):
             cv_text += f"{i}. {project.get('title', '')}\n"
             if project.get('duration'):
@@ -3342,6 +3366,8 @@ Please format the CV with:
 4. Professional language and structure
 5. Remove any duplicate sections or content
 6. Ensure all content is relevant and well-organized
+7. Place all content under the correct section headers
+8. Remove any scattered or misplaced content
 
 Return only the formatted CV content, no additional commentary."""
 
@@ -3357,7 +3383,105 @@ Return only the formatted CV content, no additional commentary."""
         
     except Exception as e:
         print(f"AI formatting failed: {e}")
-        return cv_content  # Return original if AI fails
+        return reorganize_cv_content(cv_content)  # Use fallback reorganization
+
+def reorganize_cv_content(cv_content: str) -> str:
+    """Reorganize CV content to ensure proper section placement"""
+    try:
+        lines = cv_content.split('\n')
+        organized_sections = {
+            'personal_info': [],
+            'profile_summary': [],
+            'skills': [],
+            'experience': [],
+            'education': [],
+            'projects': []
+        }
+        
+        current_section = 'personal_info'
+        
+        for line in lines:
+            line_stripped = line.strip()
+            
+            # Detect section headers with more flexible patterns
+            if (re.search(r'PROFILE\s+SUMMARY', line_stripped, re.IGNORECASE) or 
+                re.search(r'^\s*_+\s*PROFILE\s*_+\s*$', line_stripped, re.IGNORECASE)):
+                current_section = 'profile_summary'
+                continue
+            elif (re.search(r'^\s*_+\s*SKILLS?\s*_+\s*$', line_stripped, re.IGNORECASE) or
+                  re.search(r'TECHNICAL\s+SKILLS?', line_stripped, re.IGNORECASE) or
+                  re.search(r'PROFESSIONAL\s+SKILLS?', line_stripped, re.IGNORECASE)):
+                current_section = 'skills'
+                continue
+            elif (re.search(r'^\s*_+\s*WORK\s+EXPERIENCE\s*_+\s*$', line_stripped, re.IGNORECASE) or
+                  re.search(r'^\s*_+\s*EXPERIENCE\s*_+\s*$', line_stripped, re.IGNORECASE) or
+                  re.search(r'^\s*WORK\s+EXPERIENCE\s*$', line_stripped, re.IGNORECASE)):
+                current_section = 'experience'
+                continue
+            elif (re.search(r'^\s*_+\s*EDUCATION\s*_+\s*$', line_stripped, re.IGNORECASE) or
+                  re.search(r'^\s*_+\s*EDUCATIONAL\s*_+\s*$', line_stripped, re.IGNORECASE) or
+                  re.search(r'^\s*EDUCATION\s*$', line_stripped, re.IGNORECASE)):
+                current_section = 'education'
+                continue
+            elif (re.search(r'^\s*_+\s*PROJECTS?\s*_+\s*$', line_stripped, re.IGNORECASE) or
+                  re.search(r'^\s*PROJECTS?\s*$', line_stripped, re.IGNORECASE)):
+                current_section = 'projects'
+                continue
+            
+            # Add content to current section (include non-empty lines)
+            if line_stripped and current_section:
+                organized_sections[current_section].append(line_stripped)
+        
+        # Rebuild CV with proper structure
+        rebuilt_cv = []
+        
+        # Personal info (first few lines)
+        if organized_sections['personal_info']:
+            rebuilt_cv.extend(organized_sections['personal_info'][:5])  # Name, contact info
+            rebuilt_cv.append('')
+        
+        # Profile Summary
+        if organized_sections['profile_summary']:
+            rebuilt_cv.append('_____________________________ PROFILE SUMMARY _____________________________')
+            rebuilt_cv.extend(organized_sections['profile_summary'])
+            rebuilt_cv.append('')
+        
+        # Skills
+        if organized_sections['skills']:
+            rebuilt_cv.append('_____________________________ SKILLS _____________________________')
+            rebuilt_cv.extend(organized_sections['skills'])
+            rebuilt_cv.append('')
+        
+        # Work Experience
+        if organized_sections['experience']:
+            rebuilt_cv.append('_____________________________ WORK EXPERIENCE _____________________________')
+            rebuilt_cv.extend(organized_sections['experience'])
+            rebuilt_cv.append('')
+        
+        # Education
+        if organized_sections['education']:
+            rebuilt_cv.append('_____________________________ EDUCATION _____________________________')
+            rebuilt_cv.extend(organized_sections['education'])
+            rebuilt_cv.append('')
+        
+        # Projects
+        if organized_sections['projects']:
+            rebuilt_cv.append('_____________________________ PROJECTS _____________________________')
+            rebuilt_cv.extend(organized_sections['projects'])
+            rebuilt_cv.append('')
+        
+        result = '\n'.join(rebuilt_cv)
+        
+        # If no sections were found, return original content
+        if len(result.strip()) < 100:
+            print("Warning: CV reorganization resulted in very short content, returning original")
+            return cv_content
+            
+        return result
+        
+    except Exception as e:
+        print(f"CV reorganization failed: {e}")
+        return cv_content
 
 def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
     """Generate a modern, professional PDF using ReportLab 4.4.2"""

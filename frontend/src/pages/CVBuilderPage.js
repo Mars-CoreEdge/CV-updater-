@@ -889,11 +889,14 @@ function CVBuilderPage() {
 
   const addSkill = (type, skill) => {
     if (skill.trim()) {
+      // Handle comma-separated skills
+      const skills = skill.split(',').map(s => s.trim()).filter(s => s);
+      
       setCvData(prev => ({
         ...prev,
         skills: {
           ...prev.skills,
-          [type]: [...prev.skills[type], skill.trim()]
+          [type]: [...prev.skills[type], ...skills]
         }
       }));
       setTempInputs(prev => ({
@@ -1121,7 +1124,14 @@ function CVBuilderPage() {
               <TextArea
                 value={cvData.profileSummary}
                 onChange={(e) => updateCvData('profileSummary', e.target.value)}
-                placeholder="Write a compelling summary that highlights your key strengths, experience, and career objectives..."
+                onKeyDown={(e) => {
+                  // Allow Enter for new lines, Ctrl+Enter to submit
+                  if (e.key === 'Enter' && e.ctrlKey) {
+                    e.preventDefault();
+                    // Could add auto-save or other functionality here
+                  }
+                }}
+                placeholder="Write a compelling summary that highlights your key strengths, experience, and career objectives... (Press Enter for new line)"
                 rows={6}
               />
             </FormGroup>
@@ -1134,6 +1144,9 @@ function CVBuilderPage() {
             <SectionTitle>🛠️ Skills</SectionTitle>
             <FormGroup>
               <Label>Technical Skills</Label>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '8px' }}>
+                💡 Press Enter to add each skill. Use commas for multiple skills at once.
+              </div>
               <TagInput>
                 {cvData.skills.technical.map((skill, index) => (
                   <Tag key={index}>
@@ -1150,12 +1163,15 @@ function CVBuilderPage() {
                       addSkill('technical', tempInputs.technicalSkill);
                     }
                   }}
-                  placeholder="Type a skill and press Enter..."
+                  placeholder="Type a skill and press Enter to add..."
                 />
               </TagInput>
             </FormGroup>
             <FormGroup>
               <Label>Professional Skills</Label>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '8px' }}>
+                💡 Press Enter to add each skill. Use commas for multiple skills at once.
+              </div>
               <TagInput>
                 {cvData.skills.professional.map((skill, index) => (
                   <Tag key={index}>
@@ -1172,7 +1188,7 @@ function CVBuilderPage() {
                       addSkill('professional', tempInputs.professionalSkill);
                     }
                   }}
-                  placeholder="Type a skill and press Enter..."
+                  placeholder="Type a skill and press Enter to add..."
                 />
               </TagInput>
             </FormGroup>
@@ -1215,12 +1231,19 @@ function CVBuilderPage() {
                 </FormGroup>
                 <FormGroup>
                   <Label>Description</Label>
-                  <TextArea
-                    value={exp.description}
-                    onChange={(e) => updateExperience(index, 'description', e.target.value)}
-                    placeholder="Describe your role and responsibilities..."
-                    rows={3}
-                  />
+                                  <TextArea
+                  value={exp.description}
+                  onChange={(e) => updateExperience(index, 'description', e.target.value)}
+                  onKeyDown={(e) => {
+                    // Allow Enter for new lines, Ctrl+Enter to submit
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      e.preventDefault();
+                      // Could add auto-save or other functionality here
+                    }
+                  }}
+                  placeholder="Describe your role and responsibilities... (Press Enter for new line)"
+                  rows={3}
+                />
                 </FormGroup>
               </ItemCard>
             ))}
@@ -1296,12 +1319,19 @@ function CVBuilderPage() {
                 </FormGroup>
                 <FormGroup>
                   <Label>Description</Label>
-                  <TextArea
-                    value={project.description}
-                    onChange={(e) => updateProject(index, 'description', e.target.value)}
-                    placeholder="Describe what the project does and your role..."
-                    rows={3}
-                  />
+                                  <TextArea
+                  value={project.description}
+                  onChange={(e) => updateProject(index, 'description', e.target.value)}
+                  onKeyDown={(e) => {
+                    // Allow Enter for new lines, Ctrl+Enter to submit
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      e.preventDefault();
+                      // Could add auto-save or other functionality here
+                    }
+                  }}
+                  placeholder="Describe what the project does and your role... (Press Enter for new line)"
+                  rows={3}
+                />
                 </FormGroup>
                 <FormGroup>
                   <Label>Duration</Label>
