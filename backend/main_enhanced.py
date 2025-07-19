@@ -5,6 +5,326 @@ from pydantic import BaseModel
 import sqlite3
 import PyPDF2
 import docx2txt
+<<<<<<< HEAD
+=======
+from dotenv import load_dotenv
+import os
+import requests
+import re
+import psycopg2
+from fpdf import FPDF
+from io import BytesIO
+
+# Import database connection
+try:
+    from db import get_db_cursor
+    USE_SUPABASE = False  # Temporarily using SQLite
+    print("✅ Using SQLite database (temporary)")
+except ImportError:
+    print("❌ ERROR: db.py not found. Please ensure the database configuration file exists.")
+    raise ImportError("Database configuration file (db.py) is required")
+
+# Enhanced Section Detection Patterns
+SECTION_PATTERNS = {
+    "education": [
+        r"^[_\-=\s]*EDUCATION[_\-=\s]*$",
+        r"^[_\-=\s]*EDUCATIONAL\s+BACKGROUND[_\-=\s]*$",
+        r"^[_\-=\s]*EDUCATION\s+&\s+QUALIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*ACADEMIC\s+BACKGROUND[_\-=\s]*$",
+        r"^[_\-=\s]*QUALIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*ACADEMIC\s+QUALIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*EDUCATION\s+&\s+TRAINING[_\-=\s]*$"
+    ],
+    "experience": [
+        r"^[_\-=\s]*EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*WORK\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*EMPLOYMENT\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*WORK\s+HISTORY[_\-=\s]*$"
+    ],
+    "profile": [
+        r"^[_\-=\s]*PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFILE\s+SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$",
+        r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*OBJECTIVE[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+OBJECTIVE[_\-=\s]*$"
+    ],
+    "skills": [
+        r"^[_\-=\s]*SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
+        r"^[_\-=\s]*EXPERTISE[_\-=\s]*$"
+    ],
+    "projects": [
+        r"^[_\-=\s]*PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*PROJECT\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*KEY\s+PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*SELECTED\s+PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*PORTFOLIO[_\-=\s]*$"
+    ]
+
+# Load .env from the backend directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
+
+# Set environment variables if not already set
+if not os.getenv('SUPABASE_URL'):
+    os.environ['SUPABASE_URL'] = 'https://mqzmgrycagqyaqrxyrbl.supabase.co'
+if not os.getenv('SUPABASE_ANON_KEY'):
+    os.environ['SUPABASE_ANON_KEY'] = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xem1ncnljYWdxeWFxcnh5cmJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxOTczOTksImV4cCI6MjA2Nzc3MzM5OX0.ENd4YMcum6l2lTqQ4U9BvHSFOWLdP84lwCpEfvOMjlI'
+if not os.getenv('OPENAI_API_KEY'):
+    print("⚠️  Warning: OPENAI_API_KEY not found in environment variables")
+    print("   Please set your OpenAI API key as an environment variable")
+    print("   Example: export OPENAI_API_KEY='your-api-key-here'")
+
+def find_section_in_cv(cv_content: str, section_name: str) -> dict:
+    """
+    Find a specific section in CV content using robust regex patterns.
+    Returns dict with start, end, content, and header info.
+    """
+    if section_name not in SECTION_PATTERNS:
+        return None
+    
+    lines = cv_content.split('\n')
+    patterns = SECTION_PATTERNS[section_name]
+    
+    for i, line in enumerate(lines):
+        line_upper = line.upper().strip()
+        for pattern in patterns:
+            if re.match(pattern, line_upper, re.IGNORECASE):
+                # Found the section header
+                start_line = i
+                header_line = line
+                
+                # Find the end of this section (next section or end of file)
+                end_line = len(lines)
+                for j in range(i + 1, len(lines)):
+                    # Check if this line is a header for another section
+                    for other_section, other_patterns in SECTION_PATTERNS.items():
+                        if other_section != section_name:
+                            for other_pattern in other_patterns:
+                                if re.match(other_pattern, lines[j].upper().strip(), re.IGNORECASE):
+                                    end_line = j
+                                    break
+                            if end_line != len(lines):
+                                break
+                    if end_line != len(lines):
+                        break
+                
+                # Extract section content
+                section_content = '\n'.join(lines[start_line:end_line])
+                
+                    'start_line': start_line,
+                    'end_line': end_line,
+                    'start_pos': cv_content.find(line),
+                    'end_pos': cv_content.find('\n'.join(lines[:end_line])) + len('\n'.join(lines[:end_line])),
+                    'content': section_content,
+                    'header': header_line,
+                    'found': True
+    
+
+def insert_content_in_section_enhanced(cv_content: str, section_name: str, new_content: str, insert_mode: str = "append") -> str:
+    """
+    Insert content into a specific CV section with enhanced logic.
+    
+    Args:
+        cv_content: Full CV content
+        section_name: Name of section to update
+        new_content: Content to insert
+        insert_mode: "append", "prepend", or "replace"
+    
+    Returns:
+        Updated CV content
+    """
+    section_info = find_section_in_cv(cv_content, section_name)
+    lines = cv_content.split('\n')
+    
+    if section_info and section_info['found']:
+        # Section exists - insert content appropriately
+        start_line = section_info['start_line']
+        end_line = section_info['end_line']
+        
+        if insert_mode == "replace":
+            # Replace entire section content
+            new_section_lines = [lines[start_line]]  # Keep header
+            new_section_lines.extend(new_content.split('\n'))
+            lines = lines[:start_line] + new_section_lines + lines[end_line:]
+        elif insert_mode == "prepend":
+            # Add content at beginning of section (after header)
+            new_section_lines = [lines[start_line]]  # Keep header
+            new_section_lines.extend(new_content.split('\n'))
+            new_section_lines.extend(lines[start_line + 1:end_line])
+            lines = lines[:start_line] + new_section_lines + lines[end_line:]
+        else:  # append
+            # Add content at end of section
+            new_section_lines = lines[start_line:end_line]
+            new_section_lines.extend(new_content.split('\n'))
+            lines = lines[:start_line] + new_section_lines + lines[end_line:]
+    else:
+        # Section doesn't exist - create it
+        # Find a good position to insert (after profile/summary, before experience)
+        insert_position = len(lines)
+        
+        # Try to insert after profile/summary
+        profile_info = find_section_in_cv(cv_content, "profile")
+        if profile_info and profile_info['found']:
+            insert_position = profile_info['end_line']
+        else:
+            # Try to insert after first few lines (name, contact info)
+            for i in range(min(10, len(lines))):
+                if re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', lines[i].upper().strip()):
+                    insert_position = i
+                    break
+        
+        # Create section header
+        new_section_lines = [section_header] + new_content.split('\n')
+        
+        lines = lines[:insert_position] + [''] + new_section_lines + lines[insert_position:]
+    
+    return '\n'.join(lines)
+
+def generate_enhanced_pdf(cv_content: str) -> BytesIO:
+    """
+    Generate a well-formatted PDF from CV content with enhanced styling.
+    """
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Set fonts (fallback to default if custom fonts not available)
+    try:
+        pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+        pdf.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf', uni=True)
+        use_custom_font = True
+    except:
+        use_custom_font = False
+    
+    # Parse CV content
+    lines = cv_content.split('\n')
+    
+    # Extract name and title (first few lines)
+    name = ""
+    title = ""
+    contact_info = []
+    
+    for i, line in enumerate(lines[:10]):
+        line = line.strip()
+        if line and not re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', line):
+            if not name:
+                name = line
+            elif not title and len(line) < 50:
+                title = line
+            elif '@' in line or re.match(r'^[\+]?[0-9\-\s\(\)]+$', line) or 'www.' in line:
+                contact_info.append(line)
+    
+    # Header section
+    if name:
+        if use_custom_font:
+            pdf.set_font('DejaVu', 'B', 20)
+        else:
+            pdf.set_font('Arial', 'B', 20)
+        pdf.cell(0, 10, name, ln=True, align='C')
+    
+    if title:
+        if use_custom_font:
+            pdf.set_font('DejaVu', '', 14)
+        else:
+            pdf.set_font('Arial', '', 14)
+        pdf.cell(0, 8, title, ln=True, align='C')
+    
+    # Contact info
+    if contact_info:
+        if use_custom_font:
+            pdf.set_font('DejaVu', '', 10)
+        else:
+            pdf.set_font('Arial', '', 10)
+        for contact in contact_info:
+            pdf.cell(0, 6, contact, ln=True, align='C')
+    
+    pdf.ln(10)
+    
+    # Process sections
+    current_section = None
+    section_content = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this is a section header
+        is_header = False
+        for section_name, patterns in SECTION_PATTERNS.items():
+            for pattern in patterns:
+                if re.match(pattern, line.upper(), re.IGNORECASE):
+                    # Process previous section
+                    if current_section and section_content:
+                        _write_section_to_pdf(pdf, current_section, section_content, use_custom_font)
+                    
+                    # Start new section
+                    current_section = section_name
+                    section_content = []
+                    is_header = True
+                    break
+            if is_header:
+                break
+        
+        if not is_header and current_section:
+            section_content.append(line)
+    
+    # Process last section
+    if current_section and section_content:
+        _write_section_to_pdf(pdf, current_section, section_content, use_custom_font)
+    
+    # Return PDF as bytes
+    pdf_bytes = BytesIO()
+    pdf.output(pdf_bytes, 'S')
+    pdf_bytes.seek(0)
+    return pdf_bytes
+
+def _write_section_to_pdf(pdf, section_name: str, content_lines: list, use_custom_font: bool = False):
+    """Helper function to write a section to PDF with proper formatting."""
+    # Section header
+    if use_custom_font:
+        pdf.set_font('DejaVu', 'B', 14)
+    else:
+        pdf.set_font('Arial', 'B', 14)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 8, section_name.upper(), ln=True, fill=True)
+    pdf.ln(2)
+    
+    # Section content
+    if use_custom_font:
+        pdf.set_font('DejaVu', '', 10)
+    else:
+        pdf.set_font('Arial', '', 10)
+    
+    for line in content_lines:
+        if line.strip():
+            # Check if this looks like a bullet point or subheading
+            if line.strip().startswith('•') or line.strip().startswith('-'):
+                pdf.cell(10, 6, '', ln=False)  # Indent
+                pdf.cell(0, 6, line.strip(), ln=True)
+            elif re.match(r'^[A-Z][A-Za-z\s]+:', line.strip()):
+                # Subheading (like "Company: ", "Duration: ")
+                if use_custom_font:
+                    pdf.set_font('DejaVu', 'B', 10)
+                else:
+                    pdf.set_font('Arial', 'B', 10)
+                pdf.cell(0, 6, line.strip(), ln=True)
+                if use_custom_font:
+                    pdf.set_font('DejaVu', '', 10)
+                else:
+                    pdf.set_font('Arial', '', 10)
+            else:
+                pdf.cell(0, 6, line.strip(), ln=True)
+    
+    pdf.ln(5)
+>>>>>>> ff0da5b (🔒 Fix security: Remove hardcoded API keys and add environment setup guide)
 
 # Advanced PDF Processing Libraries
 try:
