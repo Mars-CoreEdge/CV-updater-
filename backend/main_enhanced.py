@@ -12,6 +12,11 @@ import re
 import psycopg2
 from fpdf import FPDF
 from io import BytesIO
+import json
+import threading
+from contextlib import contextmanager
+from typing import List, Optional
+from datetime import datetime
 
 # Import database connection
 try:
@@ -22,9 +27,74 @@ except ImportError:
     print("❌ ERROR: db.py not found. Please ensure the database configuration file exists.")
     raise ImportError("Database configuration file (db.py) is required")
 
-# Enhanced Section Detection Patterns
+# Enhanced Section Detection Patterns - Updated for simple CV format
 SECTION_PATTERNS = {
+    "contact": [
+        r"^CONTACT\s+INFORMATION$",
+        r"^CONTACT$",
+        r"^PERSONAL\s+INFORMATION$",
+        r"^DETAILS$",
+        r"^[_\-=\s]*CONTACT\s+INFORMATION[_\-=\s]*$",
+        r"^[_\-=\s]*CONTACT[_\-=\s]*$",
+        r"^[_\-=\s]*PERSONAL\s+INFORMATION[_\-=\s]*$",
+        r"^[_\-=\s]*DETAILS[_\-=\s]*$"
+    ],
+    "profile": [
+        r"^ABOUT\s+MYSELF$",
+        r"^ABOUT\s+ME$",
+        r"^PROFILE$",
+        r"^PROFILE\s+SUMMARY$",
+        r"^SUMMARY$",
+        r"^PERSONAL\s+PROFILE$",
+        r"^OBJECTIVE$",
+        r"^CAREER\s+OBJECTIVE$",
+        r"^[_\-=\s]*ABOUT\s+MYSELF[_\-=\s]*$",
+        r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$",
+        r"^[_\-=\s]*PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFILE\s+SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*OBJECTIVE[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+OBJECTIVE[_\-=\s]*$"
+    ],
+    "skills": [
+        r"^SKILLS$",
+        r"^TECHNICAL\s+SKILLS$",
+        r"^PROFESSIONAL\s+SKILLS$",
+        r"^CORE\s+SKILLS$",
+        r"^COMPETENCIES$",
+        r"^EXPERTISE$",
+        r"^[_\-=\s]*SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
+        r"^[_\-=\s]*EXPERTISE[_\-=\s]*$"
+    ],
+    "experience": [
+        r"^WORK\s+EXPERIENCE$",
+        r"^EXPERIENCE$",
+        r"^PROFESSIONAL\s+EXPERIENCE$",
+        r"^EMPLOYMENT\s+HISTORY$",
+        r"^CAREER\s+HISTORY$",
+        r"^WORK\s+HISTORY$",
+        r"^[_\-=\s]*WORK\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*EMPLOYMENT\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*WORK\s+HISTORY[_\-=\s]*$"
+    ],
     "education": [
+        r"^EDUCATION\s+AND\s+TRAINING$",
+        r"^EDUCATION$",
+        r"^EDUCATIONAL\s+BACKGROUND$",
+        r"^EDUCATION\s+&\s+QUALIFICATIONS$",
+        r"^ACADEMIC\s+BACKGROUND$",
+        r"^QUALIFICATIONS$",
+        r"^ACADEMIC\s+QUALIFICATIONS$",
+        r"^EDUCATION\s+&\s+TRAINING$",
+        r"^[_\-=\s]*EDUCATION\s+AND\s+TRAINING[_\-=\s]*$",
         r"^[_\-=\s]*EDUCATION[_\-=\s]*$",
         r"^[_\-=\s]*EDUCATIONAL\s+BACKGROUND[_\-=\s]*$",
         r"^[_\-=\s]*EDUCATION\s+&\s+QUALIFICATIONS[_\-=\s]*$",
@@ -33,37 +103,49 @@ SECTION_PATTERNS = {
         r"^[_\-=\s]*ACADEMIC\s+QUALIFICATIONS[_\-=\s]*$",
         r"^[_\-=\s]*EDUCATION\s+&\s+TRAINING[_\-=\s]*$"
     ],
-    "experience": [
-        r"^[_\-=\s]*EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*WORK\s+EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*PROFESSIONAL\s+EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*EMPLOYMENT\s+HISTORY[_\-=\s]*$",
-        r"^[_\-=\s]*CAREER\s+HISTORY[_\-=\s]*$",
-        r"^[_\-=\s]*WORK\s+HISTORY[_\-=\s]*$"
-    ],
-    "profile": [
-        r"^[_\-=\s]*PROFILE[_\-=\s]*$",
-        r"^[_\-=\s]*PROFILE\s+SUMMARY[_\-=\s]*$",
-        r"^[_\-=\s]*SUMMARY[_\-=\s]*$",
-        r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$",
-        r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$",
-        r"^[_\-=\s]*OBJECTIVE[_\-=\s]*$",
-        r"^[_\-=\s]*CAREER\s+OBJECTIVE[_\-=\s]*$"
-    ],
-    "skills": [
-        r"^[_\-=\s]*SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*PROFESSIONAL\s+SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
-        r"^[_\-=\s]*EXPERTISE[_\-=\s]*$"
+    "certifications": [
+        r"^CERTIFICATIONS$",
+        r"^CERTIFICATES$",
+        r"^CERTIFICATE$",
+        r"^[_\-=\s]*CERTIFICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*CERTIFICATES[_\-=\s]*$",
+        r"^[_\-=\s]*CERTIFICATE[_\-=\s]*$"
     ],
     "projects": [
+        r"^PROJECTS$",
+        r"^PROJECT\s+EXPERIENCE$",
+        r"^KEY\s+PROJECTS$",
+        r"^SELECTED\s+PROJECTS$",
+        r"^PORTFOLIO$",
         r"^[_\-=\s]*PROJECTS[_\-=\s]*$",
         r"^[_\-=\s]*PROJECT\s+EXPERIENCE[_\-=\s]*$",
         r"^[_\-=\s]*KEY\s+PROJECTS[_\-=\s]*$",
         r"^[_\-=\s]*SELECTED\s+PROJECTS[_\-=\s]*$",
         r"^[_\-=\s]*PORTFOLIO[_\-=\s]*$"
+    ],
+    "achievements": [
+        r"^ACHIEVEMENTS$",
+        r"^AWARDS$",
+        r"^HONORS$",
+        r"^RECOGNITIONS$",
+        r"^[_\-=\s]*ACHIEVEMENTS[_\-=\s]*$",
+        r"^[_\-=\s]*AWARDS[_\-=\s]*$",
+        r"^[_\-=\s]*HONORS[_\-=\s]*$",
+        r"^[_\-=\s]*RECOGNITIONS[_\-=\s]*$"
+    ],
+    "languages": [
+        r"^LANGUAGES$",
+        r"^LANGUAGE\s+SKILLS$",
+        r"^[_\-=\s]*LANGUAGES[_\-=\s]*$",
+        r"^[_\-=\s]*LANGUAGE\s+SKILLS[_\-=\s]*$"
+    ],
+    "interests": [
+        r"^INTERESTS$",
+        r"^HOBBIES$",
+        r"^PERSONAL\s+INTERESTS$",
+        r"^[_\-=\s]*INTERESTS[_\-=\s]*$",
+        r"^[_\-=\s]*HOBBIES[_\-=\s]*$",
+        r"^[_\-=\s]*PERSONAL\s+INTERESTS[_\-=\s]*$"
     ]
 }
 
@@ -116,6 +198,43 @@ def find_section_in_cv(cv_content: str, section_name: str) -> dict:
                     'header': header_line,
                     'found': True
                 }
+    
+    # If not found with exact patterns, try fuzzy matching
+    for i, line in enumerate(lines):
+        line_upper = line.upper().strip()
+        # Check if line contains the section name (fuzzy match)
+        if section_name.upper() in line_upper and len(line_upper) < 50:
+            # Found a potential section header
+            start_line = i
+            header_line = line
+            
+            # Find the end of this section (next section or end of file)
+            end_line = len(lines)
+            for j in range(i + 1, len(lines)):
+                # Check if this line is a header for another section
+                for other_section, other_patterns in SECTION_PATTERNS.items():
+                    if other_section != section_name:
+                        for other_pattern in other_patterns:
+                            if re.match(other_pattern, lines[j].upper().strip(), re.IGNORECASE):
+                                end_line = j
+                                break
+                        if end_line != len(lines):
+                            break
+                if end_line != len(lines):
+                    break
+            
+            # Extract section content
+            section_content = '\n'.join(lines[start_line:end_line])
+            
+            return {
+                'start_line': start_line,
+                'end_line': end_line,
+                'start_pos': cv_content.find(line),
+                'end_pos': cv_content.find('\n'.join(lines[:end_line])) + len('\n'.join(lines[:end_line])),
+                'content': section_content,
+                'header': header_line,
+                'found': True
+            }
     
     return {'found': False}
 
@@ -184,6 +303,9 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
     """
     Generate a well-formatted PDF from CV content with enhanced styling.
     """
+    # Clean the CV content before generating PDF
+    cv_content = clean_cv_text(cv_content)
+    
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -529,16 +651,32 @@ from contextlib import contextmanager
 # Global database lock
 db_lock = threading.RLock()
 
+def get_db_connection():
+    """Get database connection with proper error handling"""
+    try:
+        # Try to use the imported get_db_cursor from db.py
+        from db import get_db_cursor
+        # This will return a connection from the db.py module
+        return None  # For now, we'll use SQLite fallback
+    except ImportError:
+        # Fallback to SQLite
+        import sqlite3
+        conn = sqlite3.connect('cv_updater.db', timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
+
 @contextmanager
 def get_db_cursor_context():
-    """Context manager for database operations with automatic cleanup"""
-    conn = None
+    """Context manager for database cursor with proper connection handling"""
     cursor = None
+    conn = None
     try:
-        cursor, conn = get_db_cursor()
+        import sqlite3
+        conn = sqlite3.connect('cv_updater.db', timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        cursor = conn.cursor()
         yield cursor, conn
-        if conn:
-            conn.commit()
+        conn.commit()
     except Exception as e:
         if conn:
             conn.rollback()
@@ -575,6 +713,9 @@ def extract_text_from_file(file: UploadFile) -> str:
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format. Please use PDF, DOCX, or TXT files.")
         
+        # Clean up Unicode characters and normalize text
+        extracted_text = clean_cv_text(extracted_text)
+        
         if not extracted_text or len(extracted_text.strip()) < 10:
             raise HTTPException(status_code=400, detail="Could not extract meaningful text from file. Please check the file content.")
         
@@ -586,6 +727,47 @@ def extract_text_from_file(file: UploadFile) -> str:
     except Exception as e:
         print(f"❌ Error extracting text from {file.filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
+
+def clean_cv_text(text: str) -> str:
+    """Clean and normalize CV text by removing problematic Unicode characters"""
+    import unicodedata
+    
+    # Remove or replace problematic Unicode characters
+    cleaned_text = text
+    
+    # Replace common Unicode icons with text equivalents
+    unicode_replacements = {
+        '\uf1ad': '',  # Remove problematic Unicode character
+        '\uf0f1': 'Phone: ',  # Phone icon
+        '\uf0e0': 'Email: ',  # Email icon
+        '\uf08c': 'LinkedIn: ',  # LinkedIn icon
+        '\uf3c5': 'Home: ',  # Home icon
+        '\uf1ad': '',  # Building/company icon
+        '\uf0b1': '',  # Other problematic characters
+        '\u2013': '-',  # En dash
+        '\u2014': '-',  # Em dash
+        '\u2018': "'",  # Left single quote
+        '\u2019': "'",  # Right single quote
+        '\u201c': '"',  # Left double quote
+        '\u201d': '"',  # Right double quote
+        '\u2022': '•',  # Bullet point
+        '\u2026': '...',  # Ellipsis
+    }
+    
+    for unicode_char, replacement in unicode_replacements.items():
+        cleaned_text = cleaned_text.replace(unicode_char, replacement)
+    
+    # Remove other problematic Unicode characters that can't be encoded in latin-1
+    cleaned_text = ''.join(char for char in cleaned_text if ord(char) < 256 or char in '•')
+    
+    # Normalize Unicode characters
+    cleaned_text = unicodedata.normalize('NFKC', cleaned_text)
+    
+    # Clean up extra whitespace
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+    cleaned_text = re.sub(r'\n\s*\n', '\n\n', cleaned_text)
+    
+    return cleaned_text.strip()
 
 def extract_text_from_pdf(pdf_content: bytes) -> str:
     """Enhanced PDF text extraction with multiple fallback methods"""
@@ -763,7 +945,7 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
     if any(kw in msg for kw in ["update", "change", "modify"]) and ("education" in msg or "degree" in msg or "phd" in msg or "master" in msg or "bachelor" in msg or "university" in msg or "college" in msg):
         print("[DEBUG] classify_message_fallback: Detected EDUCATION_UPDATE")
         return {"category": "EDUCATION_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
-
+    
     # READ OPERATIONS
     if any(phrase in msg for phrase in ["show cv", "display cv", "my cv", "current cv"]):
         print("[DEBUG] classify_message_fallback: Detected CV_SHOW")
@@ -980,7 +1162,7 @@ def extract_projects_from_cv(cv_content: str) -> list:
     projects_section = extract_section_from_cv(cv_content, 'projects')
     if not projects_section:
         print("[DEBUG] No 'Projects' section found in CV.")
-        return []
+    return []
     # Try to split by lines and look for project-like entries
     lines = projects_section.split('\n')
     projects = []
@@ -1253,6 +1435,259 @@ def extract_education_fallback(message: str) -> str:
 
 # ===== NEW CRUD HELPER FUNCTIONS =====
 
+def extract_intelligent_content(message: str) -> tuple[str, str]:
+    """
+    Intelligently extract main content and auto-detect section from a message.
+    Returns (extracted_content, detected_section)
+    """
+    message_lower = message.lower().strip()
+    
+    # Auto-detect section based on keywords and patterns
+    section_keywords = {
+        "skills": ["skill", "technology", "programming", "language", "framework", "tool", "software", "expertise", "proficient", "know", "learned", "mastered"],
+        "experience": ["experience", "work", "job", "employment", "position", "role", "responsibility", "led", "managed", "developed", "built", "created", "implemented"],
+        "education": ["education", "degree", "university", "college", "school", "graduated", "studied", "certification", "course", "diploma", "masters", "bachelors", "phd"],
+        "projects": ["project", "built", "created", "developed", "application", "website", "app", "system", "platform", "tool", "software"],
+        "contact": ["contact", "phone", "email", "linkedin", "address", "location", "portfolio", "website"],
+        "profile": ["profile", "summary", "about", "objective", "introduction", "background", "overview"],
+        "achievements": ["achievement", "award", "recognition", "honor", "accomplishment", "success", "milestone"],
+        "languages": ["language", "speak", "fluent", "conversational", "native", "bilingual"],
+        "interests": ["interest", "hobby", "passion", "enjoy", "like", "love", "favorite"]
+    }
+    
+    # Count keyword matches for each section
+    section_scores = {}
+    for section, keywords in section_keywords.items():
+        score = sum(1 for keyword in keywords if keyword in message_lower)
+        section_scores[section] = score
+    
+    # Find the section with highest score
+    detected_section = max(section_scores.items(), key=lambda x: x[1])[0] if section_scores else "skills"
+    
+    # If no clear section detected, try to infer from content patterns
+    if section_scores[detected_section] == 0:
+        if any(word in message_lower for word in ["add", "include", "put", "insert"]):
+            # Look for section names in the message
+            for section in section_keywords.keys():
+                if section in message_lower:
+                    detected_section = section
+                    break
+    
+    # Extract main content (remove common prefixes and section references)
+    content = message.strip()
+    
+    # Remove common prefixes more aggressively
+    prefixes_to_remove = [
+        "add", "include", "put", "insert", "add to", "include in", "put in", "insert in",
+        "add to my", "include in my", "put in my", "insert in my",
+        "add to the", "include in the", "put in the", "insert in the",
+        "add to my skills", "add to my experience", "add to my education", "add to my projects",
+        "add to skills", "add to experience", "add to education", "add to projects",
+        "add skills", "add experience", "add education", "add projects",
+        "add to contact", "add to profile", "add to achievements", "add to languages", "add to interests",
+        "add '", "add \"", "include '", "include \"", "put '", "put \"", "insert '", "insert \"",
+        "complete my project of", "i have completed my", "i completed my", "i graduated with", "i graduated from",
+        "i learned", "i am proficient in", "i have experience in", "i led", "i managed", "i developed",
+        "i built", "i created", "i designed", "i worked on", "i studied", "i have", "i am", "i can"
+    ]
+    
+    # Remove prefixes (try multiple times to catch nested prefixes)
+    for _ in range(3):  # Try up to 3 times
+        original_content = content
+        for prefix in prefixes_to_remove:
+            if content.lower().startswith(prefix.lower()):
+                content = content[len(prefix):].strip()
+                break
+        if content == original_content:
+            break  # No more prefixes found
+    
+    # Also remove "to my [section] section" patterns
+    section_patterns = ["to my skills section", "to my experience section", "to my education section", 
+                       "to my projects section", "to my contact section", "to my profile section",
+                       "to my skills", "to my experience", "to my education", "to my projects"]
+    for pattern in section_patterns:
+        if content.lower().endswith(pattern.lower()):
+            content = content[:-len(pattern)].strip()
+            break
+    
+    # Remove quotes if present (handle both single and double quotes)
+    if content.startswith("'") and content.endswith("'"):
+        content = content[1:-1]
+    elif content.startswith('"') and content.endswith('"'):
+        content = content[1:-1]
+    elif content.startswith("'") and content.endswith("'"):
+        content = content[1:-1]
+    elif content.startswith('"') and content.endswith('"'):
+        content = content[1:-1]
+    
+    # Remove any remaining quote patterns
+    content = re.sub(r"^['\"]\s*", "", content)  # Remove leading quotes
+    content = re.sub(r"\s*['\"]$", "", content)  # Remove trailing quotes
+    
+    # Clean up extra whitespace
+    content = re.sub(r'\s+', ' ', content).strip()
+    
+    # If content is still too long, try to extract the most important part
+    if len(content) > 100:
+        # For skills, extract individual items
+        if detected_section == "skills":
+            content = extract_skills_content(content)
+        # For experience, extract the main action/achievement
+        elif detected_section == "experience":
+            content = extract_experience_content(content)
+        # For education, extract the degree/institution
+        elif detected_section == "education":
+            content = extract_education_content(content)
+        # For projects, extract the project name/description
+        elif detected_section == "projects":
+            content = extract_project_content(content)
+    
+    return content, detected_section
+
+def extract_skills_content(content: str) -> str:
+    """Extract individual skills from content"""
+    # Remove common prefixes more aggressively
+    content = re.sub(r'^(i learned|i know|i am proficient in|i can|i have experience in|i am skilled in|i have|i am|i can do|i know how to)\s*', '', content, flags=re.IGNORECASE)
+    
+    # Split by common separators
+    separators = [',', 'and', '&', '+', ';', '|', 'also', 'including']
+    parts = [content]
+    
+    for sep in separators:
+        new_parts = []
+        for part in parts:
+            new_parts.extend(part.split(sep))
+        parts = new_parts
+    
+    # Clean and filter parts
+    skills = []
+    for part in parts:
+        skill = part.strip()
+        if skill and len(skill) > 1 and len(skill.split()) <= 4:
+            # Capitalize properly
+            skill = skill.title()
+            skills.append(skill)
+    
+    return ', '.join(skills[:5])  # Limit to 5 skills
+
+def extract_experience_content(content: str) -> str:
+    """Extract main experience/achievement from content"""
+    # Remove common prefixes more aggressively
+    content = re.sub(r'^(i led|i managed|i developed|i built|i created|i implemented|i designed|i worked on|i was responsible for|i have|i am|i can)\s*', '', content, flags=re.IGNORECASE)
+    
+    # Look for key action phrases
+    action_patterns = [
+        r'(led|managed|developed|built|created|implemented|designed|architected|optimized|improved|increased|reduced|delivered|completed|achieved)\s+[^,.]*',
+        r'responsible\s+for\s+[^,.]*',
+        r'worked\s+on\s+[^,.]*',
+        r'helped\s+[^,.]*',
+        r'assisted\s+with\s+[^,.]*'
+    ]
+    
+    for pattern in action_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            result = match.group(0).strip()
+            # Limit to key concepts (avoid long descriptions)
+            if len(result.split()) > 8:
+                words = result.split()[:8]
+                result = ' '.join(words)
+            return result
+    
+    # If no pattern found, take the first meaningful phrase
+    phrases = re.split(r'[.!?,]', content)
+    for phrase in phrases:
+        phrase = phrase.strip()
+        if len(phrase.split()) <= 8 and len(phrase) > 3:
+            return phrase
+    
+    return content
+
+def extract_education_content(content: str) -> str:
+    """Extract education information from content"""
+    # Remove common prefixes more aggressively
+    content = re.sub(r'^(i graduated|i completed|i have|i earned|i studied|i have completed|i am|i was)\s*', '', content, flags=re.IGNORECASE)
+    
+    # Look for degree and institution patterns
+    degree_patterns = [
+        r'(bachelor|master|phd|mba|certification)\s+(?:of|in)\s+[^,]*',
+        r'(degree|diploma|certificate)\s+(?:in|of)\s+[^,]*',
+        r'graduated\s+(?:from|with)\s+[^,]*',
+        r'studied\s+[^,]*'
+    ]
+    
+    for pattern in degree_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            result = match.group(0).strip()
+            # Format as "Degree in Field from University"
+            if 'from' in result.lower():
+                return result
+            elif 'in' in result.lower():
+                return result
+            else:
+                return result
+    
+    # If no pattern found, extract key education info
+    words = content.split()
+    if len(words) >= 3:
+        # Look for degree + field + university pattern
+        for i in range(len(words) - 2):
+            if any(degree in words[i].lower() for degree in ['bachelor', 'master', 'phd', 'mba', 'certification']):
+                if i + 2 < len(words):
+                    return f"{words[i].title()} in {' '.join(words[i+1:i+3])}"
+    
+    # Fallback: take first meaningful phrase
+    phrases = re.split(r'[.!?,]', content)
+    for phrase in phrases:
+        phrase = phrase.strip()
+        if len(phrase.split()) <= 6 and len(phrase) > 3:
+            return phrase
+    
+    return content
+
+def extract_project_content(content: str) -> str:
+    """Extract project information from content"""
+    # Remove common prefixes more aggressively
+    content = re.sub(r'^(i built|i created|i developed|i designed|i made|my project|project called|application for|complete my project of|i have completed)\s*', '', content, flags=re.IGNORECASE)
+    
+    # Look for project patterns
+    project_patterns = [
+        r'(built|created|developed|designed)\s+[^,.]*',
+        r'project\s+(?:called|named)\s+[^,.]*',
+        r'application\s+(?:for|that)\s+[^,.]*',
+        r'website\s+(?:for|that)\s+[^,.]*',
+        r'system\s+(?:for|that)\s+[^,.]*',
+        r'(todo|task|e-commerce|weather|chat|blog|portfolio|dashboard)\s+[^,.]*'
+    ]
+    
+    for pattern in project_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            result = match.group(0).strip()
+            # Limit to key concepts
+            if len(result.split()) > 6:
+                words = result.split()[:6]
+                result = ' '.join(words)
+            return result
+    
+    # If no pattern found, extract key project info
+    words = content.split()
+    if len(words) >= 2:
+        # Look for project type + technology pattern
+        for i in range(len(words) - 1):
+            if any(tech in words[i+1].lower() for tech in ['react', 'node', 'python', 'java', 'javascript', 'vue', 'angular']):
+                return f"{words[i].title()} in {words[i+1].title()}"
+    
+    # Fallback: take first meaningful phrase
+    phrases = re.split(r'[.!?,]', content)
+    for phrase in phrases:
+        phrase = phrase.strip()
+        if len(phrase.split()) <= 6 and len(phrase) > 2:
+            return phrase
+    
+    return content
+
 def extract_main_keywords_from_message(message: str, section_type: str) -> str:
     """Extract main keywords for skills, experience, education, or projects from message."""
     clean_message = message.lower().strip()
@@ -1311,11 +1746,11 @@ def create_cv_item(cv_content: str, section_type: str, item_info: str) -> tuple[
             updated_cv = smart_section_integration(cv_content, section_type.lower(), new_items)
             return updated_cv, f"✅ Added new {section_type.lower()} section with your input!"
         # Otherwise, append to existing section
-        section_info = sections[target_section]
-        insert_position = section_info['end_line']
+            section_info = sections[target_section]
+            insert_position = section_info['end_line']
         for i, item in enumerate(new_items):
             cv_lines.insert(insert_position + i, item)
-        updated_cv = '\n'.join(cv_lines)
+            updated_cv = '\n'.join(cv_lines)
         return updated_cv, f"✅ Added to {section_type.lower()} section!"
     except Exception as e:
         print(f"Error creating CV item: {e}")
@@ -1576,7 +2011,7 @@ def generate_cv_with_projects(cursor=None, conn=None) -> str:
     try:
         # Use provided cursor or create new connection
         if cursor is None:
-            with get_db_cursor() as (cursor, conn):
+            with get_db_cursor_context() as (cursor, conn):
                 return _generate_cv_with_projects_internal(cursor, conn)
         else:
             return _generate_cv_with_projects_internal(cursor, conn)
@@ -1831,7 +2266,7 @@ def parse_cv_sections(cv_content: str) -> dict:
                     }
                     break
             if section_type in sections:
-                break
+                    break
     
     # Find section end positions
     section_names = list(sections.keys())
@@ -2081,19 +2516,28 @@ async def chat(request: ChatRequest):
             # ===== CREATE OPERATIONS =====
             elif category in ["SKILL_ADD", "EXPERIENCE_ADD", "EDUCATION_ADD", "PROJECT_ADD", "PROFILE_ADD", "CONTACT_ADD"]:
                 if cv_content:
+                    # Use intelligent content extraction to get main content and auto-detect section
+                    extracted_content, detected_section = extract_intelligent_content(request.message)
+                    
+                    # Override detected section with explicit category if available
                     section_map = {
                         "SKILL_ADD": "skills",
-                        "EXPERIENCE_ADD": "experience",
+                        "EXPERIENCE_ADD": "experience", 
                         "EDUCATION_ADD": "education",
                         "PROJECT_ADD": "projects",
                         "PROFILE_ADD": "profile",
                         "CONTACT_ADD": "contact"
                     }
-                    section_type = section_map.get(category, "skills")
-                    # Use robust insertion for all major sections
-                    print(f"[DIAG] Incoming {category}. Extracted info: {extracted_info}")
+                    section_type = section_map.get(category, detected_section)
+                    
+                    print(f"[DIAG] Incoming {category}. Original message: {request.message}")
+                    print(f"[DIAG] Extracted content: {extracted_content}")
+                    print(f"[DIAG] Detected section: {detected_section}, Using section: {section_type}")
                     print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find(section_type):][:500] if section_type in cv_content.lower() else cv_content[:500]}")
-                    updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_info, "append")
+                    
+                    # Use the extracted content instead of the full message
+                    updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_content, "append")
+                    
                     print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
                     if updated_cv != cv_content:
                         cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
@@ -2101,13 +2545,14 @@ async def chat(request: ChatRequest):
                         print(f"[DIAG] DB updated with new {section_type} section.")
                         # Extract and return the updated section
                         updated_section = extract_section_from_cv(updated_cv, section_type)
-                        response_text = f"✅ Added to {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
+                        response_text = f"✅ Added '{extracted_content}' to {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
                     else:
                         print(f"[DIAG] No changes made to {section_type} section.")
                         response_text = f"⚠️ No changes made to your {section_type} section."
+                    
                     if category == "PROJECT_ADD":
                         try:
-                            project_data = extract_project_from_message(extracted_info)
+                            project_data = extract_project_from_message(extracted_content)
                             cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", (json.dumps(project_data),))
                         except:
                             pass
@@ -2145,25 +2590,35 @@ async def chat(request: ChatRequest):
             # ===== UPDATE OPERATIONS =====
             elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE", "PROJECT_UPDATE", "PROFILE_UPDATE", "CONTACT_UPDATE"]:
                 if cv_content:
+                    # Use intelligent content extraction to get main content and auto-detect section
+                    extracted_content, detected_section = extract_intelligent_content(request.message)
+                    
+                    # Override detected section with explicit category if available
                     section_map = {
                         "SKILL_UPDATE": "skills",
                         "EXPERIENCE_UPDATE": "experience",
-                        "EDUCATION_UPDATE": "education",
+                        "EDUCATION_UPDATE": "education", 
                         "PROJECT_UPDATE": "projects",
                         "PROFILE_UPDATE": "profile",
                         "CONTACT_UPDATE": "contact"
                     }
-                    section_type = section_map.get(category, "skills")
-                    print(f"[DIAG] Incoming {category}. Extracted info: {extracted_info}")
+                    section_type = section_map.get(category, detected_section)
+                    
+                    print(f"[DIAG] Incoming {category}. Original message: {request.message}")
+                    print(f"[DIAG] Extracted content: {extracted_content}")
+                    print(f"[DIAG] Detected section: {detected_section}, Using section: {section_type}")
                     print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find(section_type):][:500] if section_type in cv_content.lower() else cv_content[:500]}")
-                    updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_info, "append")
+                    
+                    # Use the extracted content instead of the full message
+                    updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_content, "append")
+                    
                     print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
                     if updated_cv != cv_content:
                         cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
                         cv_updated = True
                         print(f"[DIAG] DB updated with new {section_type} section.")
                         updated_section = extract_section_from_cv(updated_cv, section_type)
-                        response_text = f"✅ Updated {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
+                        response_text = f"✅ Updated {section_type} section with '{extracted_content}'! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
                     else:
                         print(f"[DIAG] No changes made to {section_type} section.")
                         response_text = f"⚠️ No changes made to your {section_type} section."
@@ -2938,7 +3393,7 @@ async def delete_project(project_id: int):
 async def cleanup_cv():
     """Clean up duplicate sections in the CV"""
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # Get current active CV
             cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
             cv_row = cursor.fetchone()
@@ -2970,7 +3425,7 @@ async def cleanup_cv():
 @app.post("/cv/generate")
 async def generate_updated_cv():
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             updated_cv = generate_cv_with_projects(cursor, conn)
             return {"message": "CV generated successfully", "cv_content": updated_cv}
     except Exception as e:
@@ -3017,7 +3472,7 @@ async def add_projects_to_cv():
 async def get_enhanced_cv():
     """Get CV with all enhancements and projects included"""
     try:
-        with get_db_cursor() as (cursor, conn):
+        with get_db_cursor_context() as (cursor, conn):
             # Get the active CV
             cursor.execute("SELECT filename, current_content, updated_at FROM cvs WHERE is_active = TRUE LIMIT 1")
             cv_row = cursor.fetchone()
@@ -3985,17 +4440,48 @@ async def get_cv_pdf_preview():
             
             cv_content = cv_row[0]
             
+            # Clean the CV content before generating PDF
+            cv_content = clean_cv_text(cv_content)
+            
             # Generate enhanced PDF
             pdf_bytes = generate_enhanced_pdf(cv_content)
             
+            # Get the PDF content
+            pdf_content = pdf_bytes.getvalue()
+            
+            # Check if PDF was generated successfully
+            if len(pdf_content) == 0:
+                print("Warning: Generated PDF is empty, using fallback")
+                # Use a simple text-based fallback
+                pdf_content = f"CV Content:\n\n{cv_content}".encode('utf-8')
+                return Response(
+                    content=pdf_content,
+                    media_type="text/plain",
+                    headers={"Content-Disposition": "inline; filename=cv.txt"}
+                )
+            
             return Response(
-                content=pdf_bytes.getvalue(),
+                content=pdf_content,
                 media_type="application/pdf",
-                headers={"Content-Disposition": "inline"}
+                headers={"Content-Disposition": "inline; filename=cv.pdf"}
             )
             
     except Exception as e:
         print(f"Error generating PDF preview: {e}")
+        # Fallback to text response
+        try:
+            with get_db_cursor_context() as (cursor, conn):
+                cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+                cv_row = cursor.fetchone()
+                if cv_row:
+                    cv_content = cv_row[0]
+                    return Response(
+                        content=cv_content.encode('utf-8'),
+                        media_type="text/plain",
+                        headers={"Content-Disposition": "inline; filename=cv_fallback.txt"}
+                    )
+        except:
+            pass
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
     try:
         # Generate updated CV with all projects and pending updates
@@ -4140,4 +4626,4 @@ handler = app
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8081) 
