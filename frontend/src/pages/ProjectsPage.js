@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ProjectChatbot from '../components/ProjectChatbot';
+import CVUploadForProjects from '../components/CVUploadForProjects';
+
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -402,6 +404,107 @@ const CreateProjectButton = styled.button`
   }
 `;
 
+const ActionButton = styled.button`
+  background: ${props => props.variant === 'primary' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 
+                props.variant === 'success' ? 'linear-gradient(135deg, #28a745, #20c997)' :
+                props.variant === 'warning' ? 'linear-gradient(135deg, #ffc107, #fd7e14)' :
+                'linear-gradient(135deg, #6c757d, #495057)'};
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin: 5px;
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .button-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+`;
+
+const ProjectCheckbox = styled.input`
+  margin-right: 10px;
+  transform: scale(1.2);
+  accent-color: #667eea;
+`;
+
+const ProjectActions = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+`;
+
+const EditButton = styled.button`
+  background: linear-gradient(135deg, #17a2b8, #138496);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(23, 162, 184, 0.3);
+  }
+`;
+
+const DeleteButton = styled.button`
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(220, 53, 69, 0.3);
+  }
+`;
+
+const AssistantActions = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 30px 0;
+  flex-wrap: wrap;
+`;
+
+const SectionTitle = styled.h2`
+  color: white;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 40px 0 20px 0;
+  text-align: center;
+  background: linear-gradient(135deg, #ffffff, #f0f4ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+`;
+
 const LoadingSpinner = styled.div`
   display: flex;
   flex-direction: column;
@@ -701,6 +804,10 @@ function ProjectsPage() {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedProjects, setSelectedProjects] = useState([]);
+  const [editingProject, setEditingProject] = useState(null);
+  const [showCVUpload, setShowCVUpload] = useState(false);
+  const [assistantActionLoading, setAssistantActionLoading] = useState('');
   const navigate = useNavigate();
 
   // Form state
@@ -717,16 +824,108 @@ function ProjectsPage() {
     loadProjects();
   }, []);
 
+  // Reload projects when component becomes visible (when navigating back to this page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Projects page became visible, reloading projects...');
+        loadProjects();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  // Test backend connectivity first
+  const testBackendConnection = async () => {
+    try {
+      const response = await axios.get('http://localhost:8081/test');
+      console.log('Backend test response:', response.data);
+      return response.data.status === 'healthy';
+    } catch (error) {
+      console.error('Backend connection test failed:', error);
+      return false;
+    }
+  };
+
+  // Create a test project if no projects exist
+  const createTestProject = async () => {
+    try {
+      const testProject = {
+        title: "Sample Project",
+        description: "This is a sample project to test the system.",
+        duration: "Jan 2024 - Mar 2024",
+        technologies: ["React", "Node.js", "MongoDB"],
+        highlights: [
+          "Built a responsive web application",
+          "Implemented RESTful API endpoints",
+          "Deployed to cloud platform"
+        ]
+      };
+      
+      const response = await axios.post('http://localhost:8081/projects/create', testProject);
+      console.log('Test project created:', response.data);
+      return response.data.project;
+    } catch (error) {
+      console.error('Error creating test project:', error);
+      return null;
+    }
+  };
+
   const loadProjects = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Use the endpoint that returns projects with IDs for deletion
-      const response = await axios.get('http://localhost:8081/projects/list');
-      setProjects(response.data.projects || []);
+      console.log('🔄 Loading projects from backend...');
+      
+      // Test backend connection first
+      const backendHealthy = await testBackendConnection();
+      if (!backendHealthy) {
+        throw new Error('Backend is not responding properly');
+      }
+      
+      // Try the primary endpoint first
+      let response;
+      try {
+        console.log('📡 Trying /projects/list endpoint...');
+        response = await axios.get('http://localhost:8081/projects/list');
+        console.log('✅ Projects API response (list):', response.data);
+        console.log('📊 Response structure:', Object.keys(response.data));
+        console.log('📋 Projects array:', response.data.projects);
+        console.log('🔢 Projects count:', response.data.projects?.length || 0);
+      } catch (primaryError) {
+        console.log('❌ Primary endpoint failed, trying fallback...');
+        console.log('🔍 Primary error:', primaryError.message);
+        // Fallback to the other projects endpoint
+        response = await axios.get('http://localhost:8081/projects/');
+        console.log('✅ Projects API response (fallback):', response.data);
+      }
+      
+      if (response.data && response.data.projects) {
+        console.log('🎯 Setting projects state with:', response.data.projects.length, 'projects');
+        setProjects(response.data.projects);
+        console.log('✅ Projects loaded successfully:', response.data.projects.length, 'projects');
+        
+        // If no projects exist, create a test project
+        if (response.data.projects.length === 0) {
+          console.log('⚠️ No projects found, creating test project...');
+          const testProject = await createTestProject();
+          if (testProject) {
+            setProjects([testProject]);
+            console.log('✅ Test project added to display');
+          }
+        }
+      } else {
+        console.log('❌ No projects found in response');
+        console.log('🔍 Response data:', response.data);
+        setProjects([]);
+      }
     } catch (error) {
-      setError(error.response?.data?.detail || 'Failed to load projects');
+      console.error('❌ Error loading projects:', error);
+      console.error('🔍 Error response:', error.response?.data);
+      setError(error.response?.data?.detail || error.message || 'Failed to load projects');
       setProjects([]);
     } finally {
       setIsLoading(false);
@@ -887,6 +1086,141 @@ function ProjectsPage() {
     }
   };
 
+  const handleDownloadCVWithSelectedProjects = async () => {
+    if (selectedProjects.length === 0) {
+      alert('Please select at least one project to include in your CV.');
+      return;
+    }
+
+    try {
+      setAssistantActionLoading('downloading');
+      const response = await axios.post('http://localhost:8081/cv/download-with-selected-projects', {
+        selected_project_ids: selectedProjects
+      }, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cv_selected_projects_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error downloading CV with selected projects. Please try again.');
+    } finally {
+      setAssistantActionLoading('');
+    }
+  };
+
+  const handleCleanupCV = async () => {
+    try {
+      setAssistantActionLoading('cleaning');
+      const response = await axios.post('http://localhost:8081/cv/cleanup');
+      alert(response.data.message);
+    } catch (error) {
+      console.error('Cleanup error:', error);
+      alert('Error cleaning up CV. Please try again.');
+    } finally {
+      setAssistantActionLoading('');
+    }
+  };
+
+  const handleCreateLinkedInBlog = async () => {
+    if (projects.length === 0) {
+      alert('No projects available to create a blog post from.');
+      return;
+    }
+
+    try {
+      setAssistantActionLoading('creating-blog');
+      const response = await axios.post('http://localhost:8081/projects/create-linkedin-blog');
+      
+      // Create a new window/tab with the blog content
+      const blogWindow = window.open('', '_blank');
+      blogWindow.document.write(`
+        <html>
+          <head>
+            <title>LinkedIn Blog Post</title>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+              h1 { color: #0077b5; }
+              .blog-content { white-space: pre-wrap; }
+            </style>
+          </head>
+          <body>
+            <h1>LinkedIn Blog Post</h1>
+            <p><strong>Generated from ${response.data.projects_used} projects</strong></p>
+            <div class="blog-content">${response.data.blog_content}</div>
+          </body>
+        </html>
+      `);
+      blogWindow.document.close();
+    } catch (error) {
+      console.error('Blog creation error:', error);
+      alert('Error creating LinkedIn blog post. Please try again.');
+    } finally {
+      setAssistantActionLoading('');
+    }
+  };
+
+  const handleProjectSelection = (projectId) => {
+    setSelectedProjects(prev => {
+      if (prev.includes(projectId)) {
+        return prev.filter(id => id !== projectId);
+      } else {
+        return [...prev, projectId];
+      }
+    });
+  };
+
+  const handleEditProject = (project) => {
+    setEditingProject(project);
+    setFormData({
+      title: project.title || '',
+      description: project.description || '',
+      duration: project.duration || '',
+      technologies: project.technologies || [],
+      highlights: project.highlights && project.highlights.length > 0 ? project.highlights : ['']
+    });
+    setShowModal(true);
+  };
+
+  const handleUpdateProject = async () => {
+    if (!editingProject || !formData.title.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      const projectData = {
+        ...formData,
+        highlights: formData.highlights.filter(h => h.trim())
+      };
+      
+      await axios.put(`http://localhost:8081/projects/${editingProject.id}`, projectData);
+      
+      // Reload projects from backend
+      await loadProjects();
+      setShowModal(false);
+      setEditingProject(null);
+      resetForm();
+    } catch (error) {
+      console.error('Error updating project:', error);
+      alert('Error updating project. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleProjectsExtracted = (extractedProjects) => {
+    setProjects(extractedProjects);
+    setShowCVUpload(false);
+    setIsLoading(false);
+  };
+
   return (
     <PageContainer>
       <FloatingShape 
@@ -941,7 +1275,7 @@ function ProjectsPage() {
                 </div>
               </CreateProjectButton>
               <CreateProjectButton 
-                onClick={handleDownloadCV}
+                onClick={() => setShowCVUpload(true)}
                 style={{
                   background: 'linear-gradient(135deg, #667eea, #764ba2)',
                   marginLeft: '15px'
@@ -949,12 +1283,62 @@ function ProjectsPage() {
               >
                 <div className="button-content">
                   <span className="icon">📄</span>
-                  Download CV with Projects
+                  Extract from CV
                 </div>
               </CreateProjectButton>
             </StatsSection>
           )}
         </Header>
+        
+        {/* CV Upload Section */}
+        {showCVUpload && (
+          <CVUploadForProjects onProjectsExtracted={handleProjectsExtracted} />
+        )}
+        
+
+        
+        {/* Assistant Actions */}
+        {!isLoading && !error && projects.length > 0 && (
+          <AssistantActions>
+            <ActionButton 
+              variant="primary" 
+              onClick={handleDownloadCVWithSelectedProjects}
+              disabled={selectedProjects.length === 0 || assistantActionLoading === 'downloading'}
+            >
+              <div className="button-content">
+                {assistantActionLoading === 'downloading' ? '⏳' : '📄'}
+                Download My CV (Selected Projects)
+              </div>
+            </ActionButton>
+            
+            <ActionButton 
+              variant="warning" 
+              onClick={handleCleanupCV}
+              disabled={assistantActionLoading === 'cleaning'}
+            >
+              <div className="button-content">
+                {assistantActionLoading === 'cleaning' ? '⏳' : '🧹'}
+                Clean Up My CV
+              </div>
+            </ActionButton>
+            
+            <ActionButton 
+              variant="success" 
+              onClick={handleCreateLinkedInBlog}
+              disabled={assistantActionLoading === 'creating-blog'}
+            >
+              <div className="button-content">
+                {assistantActionLoading === 'creating-blog' ? '⏳' : '✍️'}
+                Create LinkedIn Blog
+              </div>
+            </ActionButton>
+          </AssistantActions>
+        )}
+        
+        {/* My Projects Section */}
+        {!isLoading && !error && projects.length > 0 && (
+          <SectionTitle>My Projects</SectionTitle>
+        )}
         
         <ProjectsGrid>
           {isLoading && (
@@ -977,7 +1361,7 @@ function ProjectsPage() {
               <div className="empty-icon">💼</div>
               <div className="empty-title">No Projects Found</div>
               <div className="empty-subtitle">
-                Your CV doesn't seem to contain any project information. Create your first project manually or upload a CV with project details.
+                Upload your CV to extract projects automatically, or create your first project manually.
               </div>
               <CreateProjectButton onClick={() => setShowModal(true)}>
                 <div className="button-content">
@@ -986,7 +1370,7 @@ function ProjectsPage() {
                 </div>
               </CreateProjectButton>
               <CreateProjectButton 
-                onClick={handleDownloadCV}
+                onClick={() => setShowCVUpload(true)}
                 style={{
                   background: 'linear-gradient(135deg, #667eea, #764ba2)',
                   marginLeft: '15px'
@@ -994,15 +1378,41 @@ function ProjectsPage() {
               >
                 <div className="button-content">
                   <span className="icon">📄</span>
-                  Download CV
+                  Extract from CV
                 </div>
               </CreateProjectButton>
             </EmptyState>
           )}
           
+          {/* Debug Panel - Only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '20px',
+              borderRadius: '10px',
+              margin: '20px 0',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <h4 style={{ color: 'white', margin: '0 0 10px 0' }}>🔧 Debug Info</h4>
+              <div style={{ color: 'white', fontSize: '14px' }}>
+                <div>Projects Count: {projects.length}</div>
+                <div>Selected Projects: {selectedProjects.length}</div>
+                <div>Error: {error || 'None'}</div>
+              </div>
+            </div>
+          )}
+          
           {projects.map((project, index) => (
             <ProjectCard key={index}>
-              <ProjectTitle>{project.title || 'Untitled Project'}</ProjectTitle>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <ProjectTitle>{project.title || 'Untitled Project'}</ProjectTitle>
+                <ProjectCheckbox
+                  type="checkbox"
+                  checked={selectedProjects.includes(project.id)}
+                  onChange={() => handleProjectSelection(project.id)}
+                  title="Select this project for CV inclusion"
+                />
+              </div>
               
               {project.duration && (
                 <ProjectDuration>
@@ -1036,6 +1446,15 @@ function ProjectsPage() {
                   </HighlightsList>
                 </HighlightsContainer>
               )}
+              
+              <ProjectActions>
+                <EditButton onClick={() => handleEditProject(project)}>
+                  ✏️ Edit
+                </EditButton>
+                <DeleteButton onClick={() => handleProjectDelete(index)}>
+                  🗑️ Delete
+                </DeleteButton>
+              </ProjectActions>
             </ProjectCard>
           ))}
         </ProjectsGrid>
@@ -1046,8 +1465,12 @@ function ProjectsPage() {
         <ModalOverlay onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
           <ModalContent>
             <ModalHeader>
-              <ModalTitle>✨ Create New Project</ModalTitle>
-              <CloseButton onClick={() => setShowModal(false)}>×</CloseButton>
+              <ModalTitle>{editingProject ? '✏️ Edit Project' : '✨ Create New Project'}</ModalTitle>
+              <CloseButton onClick={() => {
+                setShowModal(false);
+                setEditingProject(null);
+                resetForm();
+              }}>×</CloseButton>
             </ModalHeader>
             
             <FormGroup>
@@ -1122,15 +1545,19 @@ function ProjectsPage() {
             </FormGroup>
             
             <ButtonGroup>
-              <ModalButton onClick={() => setShowModal(false)}>
+              <ModalButton onClick={() => {
+                setShowModal(false);
+                setEditingProject(null);
+                resetForm();
+              }}>
                 Cancel
               </ModalButton>
               <ModalButton 
                 variant="primary" 
-                onClick={handleSaveProject}
+                onClick={editingProject ? handleUpdateProject : handleSaveProject}
                 disabled={!formData.title.trim() || isSaving}
               >
-                {isSaving ? 'Saving...' : 'Save Project'}
+                {isSaving ? 'Saving...' : (editingProject ? 'Update Project' : 'Save Project')}
               </ModalButton>
             </ButtonGroup>
           </ModalContent>

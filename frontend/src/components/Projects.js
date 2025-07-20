@@ -339,6 +339,7 @@ function Projects({ cvUploaded }) {
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [extractionStatus, setExtractionStatus] = useState(null);
   const { user } = useAuth(); // Get authenticated user
 
   useEffect(() => {
@@ -352,7 +353,15 @@ function Projects({ cvUploaded }) {
     setError(null);
     
     try {
-      // Get user's projects from Supabase
+      // First try to get projects from the new API endpoint
+      const response = await fetch('http://localhost:8081/projects/all');
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.projects || []);
+        return;
+      }
+      
+      // Fallback to Supabase if new API fails
       const { data: projectsResult, error: projectsError } = await dbService.project.getUserProjects(user.id);
       
       if (projectsError) {
@@ -366,6 +375,66 @@ function Projects({ cvUploaded }) {
       setProjects([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const extractProjectsFromCV = async () => {
+    setExtractionStatus('extracting');
+    try {
+      const response = await fetch('http://localhost:8081/projects/extract-from-cv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setExtractionStatus('success');
+        setProjects(result.projects || []);
+        setTimeout(() => setExtractionStatus(null), 3000);
+      } else {
+        throw new Error('Failed to extract projects');
+      }
+    } catch (error) {
+      console.error('Error extracting projects:', error);
+      setExtractionStatus('error');
+      setTimeout(() => setExtractionStatus(null), 3000);
+    }
+  };
+
+  const deleteProject = async (projectId) => {
+    try {
+      const response = await fetch(`http://localhost:8081/projects/delete-by-title/${encodeURIComponent(projectId)}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        // Reload projects after deletion
+        await loadProjects();
+      } else {
+        throw new Error('Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      setError('Failed to delete project');
+    }
+  };
+
+  const cleanupProjects = async () => {
+    try {
+      const response = await fetch('http://localhost:8081/projects/cleanup', {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        await loadProjects();
+      } else {
+        throw new Error('Failed to cleanup projects');
+      }
+    } catch (error) {
+      console.error('Error cleaning up projects:', error);
+      setError('Failed to cleanup projects');
     }
   };
 
@@ -390,19 +459,75 @@ function Projects({ cvUploaded }) {
           <span className="icon">🚀</span>
           Projects Portfolio
         </Title>
-        {projects.length > 0 && (
-          <ProjectsStats>
-            <StatItem>
-              <span className="stat-icon">📁</span>
-              {projects.length} Projects
-            </StatItem>
-            <StatItem>
-              <span className="stat-icon">⚡</span>
-              {getTotalTechnologies()} Technologies
-            </StatItem>
-          </ProjectsStats>
-        )}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {projects.length > 0 && (
+            <ProjectsStats>
+              <StatItem>
+                <span className="stat-icon">📁</span>
+                {projects.length} Projects
+              </StatItem>
+              <StatItem>
+                <span className="stat-icon">⚡</span>
+                {getTotalTechnologies()} Technologies
+              </StatItem>
+            </ProjectsStats>
+          )}
+          <button
+            onClick={extractProjectsFromCV}
+            disabled={extractionStatus === 'extracting'}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#667eea',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {extractionStatus === 'extracting' ? '🔄 Extracting...' : '📄 Extract from CV'}
+          </button>
+          {projects.length > 0 && (
+            <button
+              onClick={cleanupProjects}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#f8f9fa',
+                color: '#6c757d',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🧹 Cleanup
+            </button>
+          )}
+        </div>
       </Header>
+      
+      {extractionStatus && (
+        <div style={{
+          padding: '15px',
+          margin: '20px 0',
+          borderRadius: '8px',
+          textAlign: 'center',
+          backgroundColor: extractionStatus === 'success' ? '#d4edda' : 
+                          extractionStatus === 'error' ? '#f8d7da' : '#fff3cd',
+          color: extractionStatus === 'success' ? '#155724' : 
+                 extractionStatus === 'error' ? '#721c24' : '#856404',
+          border: `1px solid ${extractionStatus === 'success' ? '#c3e6cb' : 
+                              extractionStatus === 'error' ? '#f5c6cb' : '#ffeaa7'}`
+        }}>
+          {extractionStatus === 'extracting' && '🔄 Extracting projects from your CV...'}
+          {extractionStatus === 'success' && '✅ Projects extracted successfully!'}
+          {extractionStatus === 'error' && '❌ Failed to extract projects. Please try again.'}
+        </div>
+      )}
       
       <ProjectsGrid>
         {isLoading && (

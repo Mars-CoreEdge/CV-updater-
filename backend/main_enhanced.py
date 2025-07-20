@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import sqlite3
 import PyPDF2
@@ -14,6 +14,7 @@ from fpdf import FPDF
 from io import BytesIO
 import json
 import threading
+import io
 from contextlib import contextmanager
 from typing import List, Optional
 from datetime import datetime
@@ -508,6 +509,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    print("🚀 Starting CV Updater backend...")
+    try:
+        init_db()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        raise e
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -564,6 +576,68 @@ def init_db():
         cursor.close()
         conn.close()
         print("✅ SQLite database initialized successfully")
+        
+        # Add some test projects if none exist
+        try:
+            cursor, conn = get_db_cursor()
+            cursor.execute("SELECT COUNT(*) FROM manual_projects")
+            project_count = cursor.fetchone()[0]
+            
+            if project_count == 0:
+                print("📝 Adding test projects to database...")
+                test_projects = [
+                    {
+                        "title": "E-Commerce Platform",
+                        "description": "Built full-stack e-commerce solution with React, Node.js, and PostgreSQL",
+                        "duration": "2023 - Present",
+                        "technologies": ["React", "Node.js", "PostgreSQL", "AWS", "Docker"],
+                        "highlights": [
+                            "Implemented user authentication, payment processing, and inventory management",
+                            "Deployed on AWS with Docker containers and CI/CD pipeline",
+                            "Technologies: React, Node.js, PostgreSQL, AWS, Docker"
+                        ],
+                        "role": "Full Stack Developer"
+                    },
+                    {
+                        "title": "Task Management App",
+                        "description": "Developed collaborative task management application with real-time updates",
+                        "duration": "2022",
+                        "technologies": ["Vue.js", "Express", "MongoDB", "Socket.io"],
+                        "highlights": [
+                            "Features include user roles, file sharing, and progress tracking",
+                            "Integrated with Google Calendar and Slack APIs",
+                            "Technologies: Vue.js, Express, MongoDB, Socket.io"
+                        ],
+                        "role": "Full Stack Developer"
+                    },
+                    {
+                        "title": "Weather Dashboard",
+                        "description": "Created weather application with location-based forecasts",
+                        "duration": "2021",
+                        "technologies": ["React", "OpenWeather API", "PWA", "Local Storage"],
+                        "highlights": [
+                            "Implemented responsive design and offline functionality",
+                            "Integrated multiple weather APIs for comprehensive data",
+                            "Technologies: React, OpenWeather API, PWA, Local Storage"
+                        ],
+                        "role": "Frontend Developer"
+                    }
+                ]
+                
+                for project in test_projects:
+                    cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
+                                  (json.dumps(project),))
+                
+                conn.commit()
+                print(f"✅ Added {len(test_projects)} test projects to database")
+            else:
+                print(f"📊 Database already contains {project_count} projects")
+                
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Could not add test projects: {e}")
         
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
@@ -935,6 +1009,26 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
     msg = message.lower()
     print(f"[DEBUG] classify_message_fallback: message='{message}'")
 
+    # PROJECT MANAGEMENT COMMANDS
+    if any(phrase in msg for phrase in ["extract projects", "extract from cv", "get projects from cv", "parse projects"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_EXTRACT")
+        return {"category": "PROJECT_EXTRACT", "extracted_info": message.strip(), "operation": "CREATE"}
+    elif any(phrase in msg for phrase in ["show my projects", "list my projects", "display projects", "my projects"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_SHOW")
+        return {"category": "PROJECT_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["delete project", "remove project", "delete a project"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_DELETE")
+        return {"category": "PROJECT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["download cv", "download my cv", "get cv download"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_DOWNLOAD")
+        return {"category": "CV_DOWNLOAD", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["clean up cv", "clean cv", "fix cv", "organize cv"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_CLEANUP")
+        return {"category": "CV_CLEANUP", "extracted_info": message.strip(), "operation": "UPDATE"}
+    elif any(phrase in msg for phrase in ["create linkedin blog", "generate blog", "write blog", "linkedin post"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
+        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
+    
     # EDUCATION ADD/UPDATE - expanded patterns
     education_add_phrases = [
         "add", "include", "insert", "put", "append", "enroll", "study", "degree", "certification", "course", "program", "school", "university", "college", "phd", "master", "bachelor"
@@ -2413,7 +2507,34 @@ def enhance_cv_smart_fallback(original_cv: str, updates: List[tuple]) -> str:
 
 @app.get("/")
 async def root():
-    return {"message": "CV Updater Chatbot API with OpenAI"}
+    return {"message": "CV Updater API is running", "status": "healthy"}
+
+@app.get("/test")
+async def test_endpoint():
+    """Test endpoint to verify backend and database connectivity"""
+    try:
+        with get_db_cursor_context() as (cursor, conn):
+            # Test database connection
+            cursor.execute("SELECT COUNT(*) FROM manual_projects")
+            project_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM cvs")
+            cv_count = cursor.fetchone()[0]
+            
+            return {
+                "status": "healthy",
+                "database": "connected",
+                "projects_count": project_count,
+                "cvs_count": cv_count,
+                "timestamp": datetime.now().isoformat()
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.post("/upload-cv/")
 async def upload_cv(
@@ -2481,6 +2602,120 @@ async def upload_cv(
     except Exception as e:
         print(f"❌ Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.post("/upload-cv-for-projects/")
+async def upload_cv_for_projects(
+    file: UploadFile = File(...),
+    extracted_text: str = Form(None)
+):
+    """Upload CV specifically for project extraction - only extracts projects section"""
+    try:
+        print(f"🔄 Starting project extraction from CV: {file.filename}")
+        
+        # Use extracted_text if provided, else extract from file
+        if extracted_text:
+            cv_text = extracted_text
+        else:
+            # For project extraction, we need to extract text without cleaning
+            # to preserve the formatting that the project extractor needs
+            content = file.file.read()
+            print(f"📄 Processing file: {file.filename} ({len(content)} bytes)")
+            
+            if not content:
+                raise HTTPException(status_code=400, detail="File is empty or corrupted")
+            
+            if file.filename.lower().endswith('.pdf'):
+                cv_text = extract_text_from_pdf(content)
+            elif file.filename.lower().endswith('.docx'):
+                cv_text = docx2txt.process(BytesIO(content))
+            elif file.filename.lower().endswith('.txt'):
+                # Handle different encodings for text files
+                try:
+                    cv_text = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    try:
+                        cv_text = content.decode('latin-1')
+                    except UnicodeDecodeError:
+                        cv_text = content.decode('utf-8', errors='ignore')
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported file format. Please use PDF, DOCX, or TXT files.")
+            
+            # For project extraction, we don't clean the text to preserve formatting
+            cv_text = cv_text.strip()
+        
+        if not cv_text or len(cv_text.strip()) < 50:
+            raise HTTPException(
+                status_code=400, 
+                detail="The uploaded file doesn't contain enough readable text. Please ensure your CV has substantial content."
+            )
+        
+        print(f"📄 CV content preview: {cv_text[:200]}...")
+        
+        with get_db_cursor_context() as (cursor, conn):
+            # Generate a title from filename
+            title = file.filename.replace('.pdf', '').replace('.docx', '').replace('.txt', '').replace('_', ' ').title()
+            
+            # Clear all existing projects when new CV is uploaded for project extraction
+            cursor.execute("DELETE FROM manual_projects")
+            print("🗑️ Cleared existing projects for new CV upload")
+            
+            # Extract ONLY projects from CV using the enhanced project extractor
+            try:
+                from project_extractor import extract_and_format_projects
+                print(f"📄 CV content length: {len(cv_text)}")
+                print(f"📄 CV content preview: {cv_text[:500]}...")
+                
+                extracted_projects = extract_and_format_projects(cv_text)
+                print(f"🔍 Extracted {len(extracted_projects)} projects from CV using enhanced extractor.")
+                
+                # Debug: Check if projects were extracted
+                if len(extracted_projects) == 0:
+                    print("⚠️ No projects extracted! Checking CV content...")
+                    if 'PROJECTS' in cv_text.upper():
+                        print("✅ 'PROJECTS' keyword found in CV")
+                    else:
+                        print("❌ 'PROJECTS' keyword NOT found in CV")
+                else:
+                    print(f"✅ Successfully extracted {len(extracted_projects)} projects")
+                    
+            except Exception as e:
+                print(f"❌ Error in project extraction: {e}")
+                import traceback
+                traceback.print_exc()
+                extracted_projects = []
+            
+            # Debug: Print extracted projects
+            for i, project in enumerate(extracted_projects):
+                print(f"  Project {i+1}: {project.get('title', 'N/A')}")
+                print(f"    Description: {project.get('description', 'N/A')}")
+                print(f"    Technologies: {project.get('technologies', [])}")
+            
+            # Insert extracted projects into database
+            for project in extracted_projects:
+                cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", (json.dumps(project),))
+            print(f"✅ Inserted {len(extracted_projects)} projects into manual_projects table.")
+            
+            # Verify projects were inserted
+            cursor.execute("SELECT COUNT(*) FROM manual_projects")
+            inserted_count = cursor.fetchone()[0]
+            print(f"📊 Verified {inserted_count} projects in database")
+        
+        return JSONResponse(status_code=200, content={
+            "message": f"✅ Successfully extracted {len(extracted_projects)} projects from your CV!", 
+            "filename": file.filename,
+            "title": title,
+            "projects_extracted": len(extracted_projects),
+            "extracted_projects": extracted_projects,  # Return the actual projects
+            "status": "projects_extracted"
+        })
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"❌ Project extraction error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Project extraction failed: {str(e)}")
 
 @app.post("/chat/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -2749,6 +2984,155 @@ async def chat(request: ChatRequest):
     • Use "Generate CV" to see final result
     • Be specific when updating/deleting items
     • I can understand various ways of saying the same thing!"""
+            
+            # ===== PROJECT MANAGEMENT COMMANDS =====
+            elif category == "PROJECT_EXTRACT":
+                try:
+                    # Extract projects from CV
+                    from project_extractor import extract_and_format_projects
+                    projects = extract_and_format_projects(cv_content)
+                    
+                    # Clear existing projects and store new ones
+                    cursor.execute("DELETE FROM manual_projects")
+                    
+                    for project in projects:
+                        project_data = {
+                            'id': project['id'],
+                            'title': project['title'],
+                            'description': project['description'],
+                            'duration': project['duration'],
+                            'technologies': project['technologies'],
+                            'highlights': project['highlights'],
+                            'role': project['role'],
+                            'created_at': datetime.now().isoformat()
+                        }
+                        
+                        cursor.execute(
+                            "INSERT INTO manual_projects (project_data) VALUES (?)",
+                            (json.dumps(project_data),)
+                        )
+                    
+                    response_text = f"✅ Extracted {len(projects)} projects from your CV!\n\n"
+                    for i, project in enumerate(projects, 1):
+                        response_text += f"{i}. **{project['title']}** ({project['duration']})\n"
+                        response_text += f"   {project['description']}\n"
+                        response_text += f"   Tech: {', '.join(project['technologies'])}\n\n"
+                    
+                    cv_updated = True
+                    
+                except Exception as e:
+                    response_text = f"❌ Error extracting projects: {str(e)}"
+            
+            elif category == "PROJECT_SHOW":
+                try:
+                    cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
+                    projects = cursor.fetchall()
+                    
+                    if not projects:
+                        response_text = "📋 No projects found. Use 'Extract projects from CV' to get started!"
+                    else:
+                        response_text = f"📋 **Your Projects ({len(projects)} total):**\n\n"
+                        for i, (project_json,) in enumerate(projects, 1):
+                            try:
+                                project = json.loads(project_json)
+                                response_text += f"{i}. **{project['title']}** ({project['duration']})\n"
+                                response_text += f"   {project['description']}\n"
+                                if project['technologies']:
+                                    response_text += f"   Tech: {', '.join(project['technologies'])}\n"
+                                if project['highlights']:
+                                    response_text += f"   Highlights: {len(project['highlights'])} items\n"
+                                response_text += "\n"
+                            except:
+                                continue
+                
+                except Exception as e:
+                    response_text = f"❌ Error showing projects: {str(e)}"
+            
+            elif category == "PROJECT_DELETE":
+                try:
+                    # Extract project title or index from message
+                    project_identifier = extracted_info.strip()
+                    
+                    cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
+                    projects = cursor.fetchall()
+                    
+                    if not projects:
+                        response_text = "❌ No projects found to delete."
+                    else:
+                        deleted = False
+                        
+                        # Try to delete by index
+                        try:
+                            index = int(project_identifier) - 1
+                            if 0 <= index < len(projects):
+                                project_json = projects[index][0]
+                                project = json.loads(project_json)
+                                project_id = project.get('id', '')
+                                
+                                cursor.execute("DELETE FROM manual_projects WHERE project_data LIKE ?", (f'%"id": "{project_id}"%',))
+                                response_text = f"✅ Deleted project: {project['title']}"
+                                deleted = True
+                        except ValueError:
+                            pass
+                        
+                        # Try to delete by title
+                        if not deleted:
+                            cursor.execute("DELETE FROM manual_projects WHERE project_data LIKE ?", (f'%"title": "{project_identifier}"%',))
+                            if cursor.rowcount > 0:
+                                response_text = f"✅ Deleted project: {project_identifier}"
+                                deleted = True
+                            else:
+                                response_text = f"❌ Project '{project_identifier}' not found."
+                
+                except Exception as e:
+                    response_text = f"❌ Error deleting project: {str(e)}"
+            
+            elif category == "CV_DOWNLOAD":
+                response_text = "📄 Your CV download is ready! Check the download section or use the download button."
+            
+            elif category == "CV_CLEANUP":
+                try:
+                    # Clean up CV content
+                    cleaned_cv = clean_cv_content(cv_content)
+                    
+                    if cleaned_cv != cv_content:
+                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (cleaned_cv,))
+                        cv_updated = True
+                        response_text = "🧹 CV cleaned up successfully! Removed duplicates and formatting issues."
+                    else:
+                        response_text = "✅ CV is already clean! No changes needed."
+                
+                except Exception as e:
+                    response_text = f"❌ Error cleaning up CV: {str(e)}"
+            
+            elif category == "LINKEDIN_BLOG":
+                try:
+                    # Get all projects
+                    cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
+                    projects = cursor.fetchall()
+                    
+                    if not projects:
+                        response_text = "❌ No projects found. Please extract projects from your CV first."
+                    else:
+                        # Generate LinkedIn blog post
+                        blog_content = generate_linkedin_blog_from_projects(projects)
+                        
+                        response_text = f"""📝 **LinkedIn Blog Post Generated Successfully!**
+
+**Blog Content:**
+{blog_content}
+
+**💡 Tips for posting:**
+• Copy the content above
+• Paste it into LinkedIn
+• Add relevant hashtags (#softwareengineering #webdevelopment #projects)
+• Tag relevant technologies/companies
+• Engage with comments
+
+**🎯 Ready to share your projects with the world!**"""
+                
+                except Exception as e:
+                    response_text = f"❌ Error generating LinkedIn blog: {str(e)}"
             
             else:
                 response_text = """👋 I'm your AI CV Assistant with full CRUD capabilities! 
@@ -4427,6 +4811,83 @@ async def download_cv():
         print(f"Error generating PDF: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
 
+@app.post("/cv/download-with-selected-projects")
+async def download_cv_with_selected_projects(selected_project_ids: List[int]):
+    """Download CV with only selected projects as PDF"""
+    try:
+        with get_db_cursor_context() as (cursor, conn):
+            # Get current CV content
+            cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
+            cv_row = cursor.fetchone()
+            
+            if not cv_row:
+                raise HTTPException(status_code=404, detail="No active CV found")
+            
+            cv_content = cv_row[0]
+            
+            # Get only selected projects
+            selected_projects = []
+            if selected_project_ids:
+                placeholders = ','.join(['?' for _ in selected_project_ids])
+                cursor.execute(f"SELECT project_data FROM manual_projects WHERE id IN ({placeholders}) ORDER BY created_at DESC", selected_project_ids)
+                project_rows = cursor.fetchall()
+                for row in project_rows:
+                    try:
+                        project_data = json.loads(row[0])
+                        selected_projects.append(project_data)
+                    except:
+                        pass
+            
+            # Generate PDF with selected projects
+            pdf_buffer = generate_cv_pdf(cv_content, selected_projects)
+            
+            return StreamingResponse(
+                io.BytesIO(pdf_buffer.getvalue()),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename=cv_selected_projects_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Download error: {e}")
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+
+@app.post("/projects/create-linkedin-blog")
+async def create_linkedin_blog_from_projects():
+    """Create LinkedIn blog post based on selected projects"""
+    try:
+        with get_db_cursor_context() as (cursor, conn):
+            # Get all projects
+            cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
+            project_rows = cursor.fetchall()
+            projects = []
+            for row in project_rows:
+                try:
+                    project_data = json.loads(row[0])
+                    projects.append(project_data)
+                except:
+                    pass
+            
+            if not projects:
+                raise HTTPException(status_code=404, detail="No projects found to create blog from")
+            
+            # Generate LinkedIn blog post
+            blog_content = generate_linkedin_blog_from_projects(projects)
+            
+            return JSONResponse(status_code=200, content={
+                "message": "✅ LinkedIn blog post generated successfully!",
+                "blog_content": blog_content,
+                "projects_used": len(projects),
+                "word_count": len(blog_content.split())
+            })
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ LinkedIn blog creation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Blog creation failed: {str(e)}")
+
 @app.get("/cv/pdf-preview")
 async def get_cv_pdf_preview():
     """Get CV as PDF for preview (not download)."""
@@ -4620,6 +5081,82 @@ async def db_cv_dump():
         return JSONResponse(content={"cvs": result})
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+def generate_linkedin_blog_from_projects(projects) -> str:
+    """Generate a LinkedIn blog post from project data."""
+    if not projects:
+        return "No projects available to generate blog post."
+    
+    blog_content = """🚀 Excited to share some of my recent projects and the technologies I've been working with!
+
+"""
+    
+    # Add projects
+    for i, (project_json,) in enumerate(projects[:3], 1):  # Limit to 3 projects
+        try:
+            project = json.loads(project_json)
+            
+            blog_content += f"**{i}. {project['title']}**\n"
+            if project['duration']:
+                blog_content += f"📅 {project['duration']}\n"
+            blog_content += f"💡 {project['description']}\n"
+            
+            if project['technologies']:
+                tech_tags = ' '.join([f"#{tech.replace(' ', '').replace('.', '').replace('-', '')}" for tech in project['technologies'][:5]])
+                blog_content += f"🛠️ {tech_tags}\n"
+            
+            if project['highlights']:
+                blog_content += f"✨ Key features: {', '.join(project['highlights'][:3])}\n"
+            
+            blog_content += "\n"
+            
+        except:
+            continue
+    
+    blog_content += """🔧 **Technologies I've been working with:**
+"""
+    
+    # Collect all technologies
+    all_technologies = set()
+    for (project_json,) in projects:
+        try:
+            project = json.loads(project_json)
+            all_technologies.update(project.get('technologies', []))
+        except:
+            continue
+    
+    # Add technology section
+    if all_technologies:
+        tech_list = list(all_technologies)[:10]  # Limit to 10 technologies
+        blog_content += f"{', '.join(tech_list)}\n\n"
+    
+    blog_content += """💭 **What I learned:**
+• Building scalable applications requires careful architecture planning
+• User experience is just as important as technical implementation
+• Continuous learning and staying updated with new technologies is crucial
+• Collaboration and code reviews improve code quality significantly
+
+#softwareengineering #webdevelopment #projects #coding #technology #innovation
+
+What projects have you been working on lately? I'd love to hear about your experiences! 👇"""
+    
+    return blog_content
+
+def clean_cv_content(cv_content: str) -> str:
+    """Clean up CV content by removing duplicates and formatting issues."""
+    lines = cv_content.split('\n')
+    cleaned_lines = []
+    seen_lines = set()
+    
+    for line in lines:
+        line = line.strip()
+        if line and line not in seen_lines:
+            cleaned_lines.append(line)
+            seen_lines.add(line)
+        elif not line and cleaned_lines and cleaned_lines[-1]:  # Add empty line only if previous line wasn't empty
+            cleaned_lines.append('')
+    
+    return '\n'.join(cleaned_lines).strip()
 
 # Vercel handler - add this at the end of the file
 handler = app

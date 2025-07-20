@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
@@ -704,14 +704,50 @@ const ConnectionIndicator = styled.div`
 
 function CVUpdaterContent() {
   const [cvUploaded, setCvUploaded] = useState(false);
+  const [cvData, setCvData] = useState(null);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
+
+  // Check for existing CV data on mount and when component becomes visible
+  useEffect(() => {
+    checkForExistingCV();
+  }, []);
+
+  // Listen for page visibility changes to reload CV data when returning to the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkForExistingCV();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  const checkForExistingCV = async () => {
+    try {
+      const response = await fetch('http://localhost:8081/cv/current/');
+      if (response.ok) {
+        const cvData = await response.json();
+        if (cvData && cvData.content && cvData.content.trim().length > 0) {
+          setCvData(cvData);
+          setCvUploaded(Date.now()); // Set timestamp to indicate CV exists
+          console.log('Existing CV found and loaded');
+        }
+      }
+    } catch (error) {
+      console.log('No existing CV found or error checking:', error);
+    }
+  };
 
   const handleFileUpload = (uploadSuccess) => {
     console.log('File upload completed:', uploadSuccess);
     if (uploadSuccess) {
       setCvUploaded(Date.now()); // Use timestamp to force refresh
+      // Also update cvData to reflect the new upload
+      checkForExistingCV();
     }
   };
 
@@ -875,6 +911,21 @@ function CVUpdaterContent() {
                   cvUploaded={cvUploaded} 
                 />
               </ModernCard>
+              
+              {/* Debug Panel - Only show in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <ModernCard style={{marginTop: '20px'}}>
+                  <div style={{ padding: '15px' }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)' }}>🔧 Debug Info</h4>
+                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      <div>CV Uploaded: {cvUploaded ? 'Yes' : 'No'}</div>
+                      <div>CV Uploaded Timestamp: {cvUploaded || 'None'}</div>
+                      <div>CV Data: {cvData ? 'Loaded' : 'None'}</div>
+                      <div>CV Content Length: {cvData?.content?.length || 0}</div>
+                    </div>
+                  </div>
+                </ModernCard>
+              )}
             </RightPanel>
           </MainContent>
         </ContentWrapper>
