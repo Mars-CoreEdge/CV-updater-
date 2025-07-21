@@ -330,7 +330,7 @@ const CopyButton = styled.button`
   }
 `;
 
-function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDelete, onProjectsReload }) {
+function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDelete, onProjectsReload, selectedProjects, handleDownloadCVWithSelectedProjects }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -420,25 +420,33 @@ function ProjectChatbot({ projects, onProjectUpdate, onProjectAdd, onProjectDele
   };
 
   const handleDownloadCV = async () => {
-    try {
-      const response = await axios.post('http://localhost:8081/cv/download', {}, {
-        responseType: 'blob'
-      });
-      
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Professional_CV_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      return "✅ Your updated CV has been downloaded to your local drive!";
-    } catch (error) {
-      console.error('Download error:', error);
-      return "❌ Sorry, I couldn't download your CV. Please try again later.";
+    if (selectedProjects && selectedProjects.length > 0) {
+      try {
+        await handleDownloadCVWithSelectedProjects();
+        return "✅ Your updated CV (with selected projects) has been downloaded!";
+      } catch (error) {
+        return "❌ Sorry, I couldn't download your CV. Please try again later.";
+      }
+    } else {
+      // fallback to all projects
+      try {
+        const response = await axios.post('http://localhost:8081/cv/download', {}, {
+          responseType: 'blob'
+        });
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Professional_CV_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return "✅ Your updated CV has been downloaded to your local drive!";
+      } catch (error) {
+        console.error('Download error:', error);
+        return "❌ Sorry, I couldn't download your CV. Please try again later.";
+      }
     }
   };
 

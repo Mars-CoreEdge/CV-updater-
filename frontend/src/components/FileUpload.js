@@ -445,19 +445,11 @@ function FileUpload({ onFileUploaded }) {
 
   const readFileContent = async (file) => {
     setUploadStatus('Reading file content...');
-    
     try {
       let extractedText = '';
-      
       if (file.type === 'application/pdf') {
-        setUploadStatus('Extracting text from PDF...');
-        try {
-          extractedText = await extractTextFromPDF(file);
-        } catch (pdfError) {
-          console.warn('Frontend PDF processing failed, will let backend handle it:', pdfError);
-          // Return null to indicate backend should handle extraction
-          return null;
-        }
+        // Let the backend handle PDF extraction for best results
+        return null;
       } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         setUploadStatus('Processing Word document...');
         // Return null to let backend handle DOCX processing
@@ -468,7 +460,6 @@ function FileUpload({ onFileUploaded }) {
       } else {
         throw new Error('Unsupported file type');
       }
-
       return extractedText;
     } catch (error) {
       console.error('Error reading file content:', error);
@@ -480,51 +471,87 @@ function FileUpload({ onFileUploaded }) {
     try {
       console.log('Starting PDF text extraction...');
       const arrayBuffer = await file.arrayBuffer();
-      
       // Load the PDF document
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
-      
       let fullText = '';
-      
       // Extract text from each page
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         console.log(`Processing page ${pageNum}/${pdf.numPages}`);
         setUploadStatus(`Extracting text from page ${pageNum}/${pdf.numPages}...`);
-        
         try {
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
-          
-          const pageText = textContent.items
-            .map(item => item.str)
-            .join(' ')
-            .trim();
-          
+          // Group items by their y position (line), and detect paragraph/section breaks
+          let lines = [];
+          let lastY = null;
+          let currentLine = [];
+          let lastLineY = null;
+          let lastLineIndent = null;
+          let lineYs = [];
+          let lineIndents = [];
+          textContent.items.forEach(item => {
+            const thisY = Math.round(item.transform[5]);
+            const thisX = Math.round(item.transform[4]);
+            if (lastY === null) {
+              lastY = thisY;
+              lastLineIndent = thisX;
+            }
+            if (Math.abs(thisY - lastY) > 2) { // New line (tolerance for small y shifts)
+              if (currentLine.length > 0) {
+                lines.push({ text: currentLine.join(' '), y: lastY, x: lastLineIndent });
+                lineYs.push(lastY);
+                lineIndents.push(lastLineIndent);
+              }
+              currentLine = [item.str];
+              lastY = thisY;
+              lastLineIndent = thisX;
+            } else {
+              currentLine.push(item.str);
+            }
+          });
+          if (currentLine.length > 0) {
+            lines.push({ text: currentLine.join(' '), y: lastY, x: lastLineIndent });
+            lineYs.push(lastY);
+            lineIndents.push(lastLineIndent);
+          }
+          // Now, join lines, inserting an extra blank line if the vertical gap or indentation is large
+          let pageText = '';
+          for (let i = 0; i < lines.length; i++) {
+            const lineText = lines[i].text.trim();
+            if (!lineText) continue;
+            pageText += lineText;
+            // If next line exists, check vertical gap and indentation
+            if (i < lines.length - 1) {
+              const gap = Math.abs(lines[i+1].y - lines[i].y);
+              const indentDiff = Math.abs(lines[i+1].x - lines[i].x);
+              // Large vertical gap or big change in indentation = new paragraph/section
+              if (gap > 15 || indentDiff > 30) {
+                pageText += '\n\n';
+              } else {
+                pageText += '\n';
+              }
+            }
+          }
+          pageText = pageText.trim();
           if (pageText) {
             fullText += pageText + '\n\n';
           }
-          
           console.log(`Page ${pageNum} text length:`, pageText.length);
         } catch (pageError) {
           console.warn(`Error processing page ${pageNum}:`, pageError);
           // Continue with other pages
         }
       }
-      
       const finalText = fullText.trim();
       console.log('PDF extraction completed. Total text length:', finalText.length);
-      
       if (!finalText || finalText.length < 10) {
         console.warn('PDF extraction resulted in minimal text');
         throw new Error('PDF appears to be empty or contains mostly images. Please try a text-based PDF or convert to TXT format. You can copy and paste your CV content into a .txt file.');
       }
-      
       return finalText;
-      
     } catch (error) {
       console.info('Frontend PDF extraction failed, but backend will handle extraction. This is normal for some files.');
-      
       if (error.message.includes('Invalid PDF')) {
         throw new Error('Invalid PDF file. Please check the file and try again.');
       } else if (error.message.includes('password')) {
@@ -536,6 +563,25 @@ function FileUpload({ onFileUploaded }) {
       } else {
         throw new Error(`PDF processing failed: ${error.message}. The backend will attempt to process your PDF file.`);
       }
+    }
+  };
+
+  const handleDownloadSelectedCV = async (selectedProjectIds) => {
+    try {
+      const response = await axios.post(
+        'http://localhost:8081/cv/download-with-selected-projects',
+        selectedProjectIds, // should be an array of IDs
+        { responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Selected_Projects_CV.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      alert('Failed to download CV with selected projects.');
     }
   };
 

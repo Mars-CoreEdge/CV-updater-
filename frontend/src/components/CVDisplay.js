@@ -572,61 +572,87 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
 
   const formatCVContent = (content) => {
     if (!content) return '';
-    
-    console.log('Formatting CV content, length:', content.length);
-    console.log('Content preview:', content.substring(0, 200));
-    
-    // If content is very short or looks like a placeholder, return it as-is
     if (content.length < 100 || content.includes('[File:') || content.includes('PDF uploaded successfully')) {
       return content;
     }
-    
-    // Split content into lines and format properly
     const lines = content.split('\n');
-    const formattedLines = [];
-    
+    let html = '';
+    let inList = false;
+    let nameRendered = false;
+    let contactBlock = [];
+    let lastWasSection = false;
+    const sectionHeaderRegex = /^(PROFILE SUMMARY|SUMMARY|SKILLS|WORK EXPERIENCE|EXPERIENCE|EDUCATION|PROJECTS|PROFESSIONAL SKILLS|TECHNICAL SKILLS|CONTACT|OBJECTIVE|QUALIFICATIONS)$/i;
+    const bulletRegex = /^([\u2022\u2023\u25E6\u2043\u2219\*-])\s?(.*)/;
+    const contactRegex = /@|\+\d|linkedin|github|email|www\./i;
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmedLine = line.trim();
-      
-      if (!trimmedLine) {
-        formattedLines.push('');
+      let line = lines[i].trim();
+      if (!line) {
+        if (inList) {
+          html += '</ul>';
+          inList = false;
+        }
+        if (contactBlock.length > 0) {
+          html += `<div style="text-align:center;margin:0 0 18px 0;font-size:1.05rem;color:#555;">${contactBlock.join('<br/>')}</div>`;
+          contactBlock = [];
+        }
         continue;
       }
-      
-      // Detect and format section headers
-      const isHeader = (
-        trimmedLine.toUpperCase() === trimmedLine && 
-        trimmedLine.length > 3 && 
-        trimmedLine.length < 80 &&
-        (trimmedLine.includes('PROFILE') || trimmedLine.includes('SUMMARY') || 
-         trimmedLine.includes('SKILLS') || trimmedLine.includes('EXPERIENCE') || 
-         trimmedLine.includes('EDUCATION') || trimmedLine.includes('PROJECTS') ||
-         trimmedLine.includes('WORK') || trimmedLine.includes('PROFESSIONAL') ||
-         trimmedLine.includes('TECHNICAL') || trimmedLine.includes('CONTACT') ||
-         trimmedLine.includes('OBJECTIVE') || trimmedLine.includes('QUALIFICATIONS'))
-      );
-      
-      if (isHeader) {
-        formattedLines.push('\n');
-        formattedLines.push(`═══ ${trimmedLine} ═══`);
-        formattedLines.push('');
-      } else {
-        formattedLines.push(line);
+      // Render name as big heading (only first non-empty line)
+      if (!nameRendered) {
+        html += `<div style="text-align:center;margin:18px 0 8px 0;"><h1 style="margin:0;font-size:2.1rem;font-weight:800;letter-spacing:0.01em;">${line}</h1></div>`;
+        nameRendered = true;
+        lastWasSection = false;
+        continue;
       }
+      // Collect contact info lines (immediately after name, up to 3 lines)
+      if (nameRendered && contactBlock.length < 3 && contactRegex.test(line)) {
+        contactBlock.push(line);
+        continue;
+      }
+      if (contactBlock.length > 0) {
+        html += `<div style="text-align:center;margin:0 0 24px 0;font-size:1.05rem;color:#555;">${contactBlock.join('<br/>')}</div>`;
+        contactBlock = [];
+      }
+      // Section headers: match only if line is exactly a section name
+      if (sectionHeaderRegex.test(line.replace(/[_\-\s]+/g, ' ').trim().toUpperCase())) {
+        if (inList) {
+          html += '</ul>';
+          inList = false;
+        }
+        if (lastWasSection) {
+          html += '<hr style="border:none;border-top:1.5px solid #e0e4ef;margin:32px 0 24px 0;">';
+        }
+        html += `<h2 style="text-align:left;text-transform:uppercase;margin:32px 0 12px 0;font-size:1.18rem;font-weight:700;letter-spacing:0.03em;border-bottom:2px solid #e0e4ef;padding-bottom:4px;">${line}</h2>`;
+        lastWasSection = true;
+        continue;
+      }
+      lastWasSection = false;
+      // Bullet points
+      const bulletMatch = line.match(bulletRegex);
+      if (bulletMatch) {
+        if (!inList) {
+          html += '<ul style="margin-left:2em;margin-bottom:0.8em;padding-left:1.2em;">';
+          inList = true;
+        }
+        html += `<li style="font-size:1rem;line-height:1.7;margin-bottom:0.3em;">${bulletMatch[2] || ''}</li>`;
+        continue;
+      } else if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      // Job titles/companies: only bold if line is short and after a section header
+      if (line.length < 60 && i > 0 && sectionHeaderRegex.test(lines[i-1].replace(/[_\-\s]+/g, ' ').trim().toUpperCase())) {
+        html += `<div style="font-weight:600;font-size:1.07rem;margin-bottom:0.2em;">${line}</div>`;
+        continue;
+      }
+      // Regular paragraph
+      html += `<p style="margin:0 0 0.7em 0;font-size:1rem;line-height:1.7;font-weight:400;">${line}</p>`;
     }
-    
-    const formattedContent = formattedLines.join('\n');
-    console.log('Formatted content length:', formattedContent.length);
-    
-    // Highlight education section if needed
-    if (highlightEducation) {
-      // Use regex to find the education section and wrap it in a span
-      return formattedContent.replace(/(═══\s*EDUCATION[\s\S]*?)(═══|$)/i, (match, p1, p2) => {
-        return `<span ref="education-section" style="background: #fffbe6; border-radius: 6px; box-shadow: 0 0 0 2px #ffe066; padding: 2px 4px;">${p1}</span>${p2}`;
-      });
+    if (inList) html += '</ul>';
+    if (contactBlock.length > 0) {
+      html += `<div style="text-align:center;margin:0 0 24px 0;font-size:1.05rem;color:#555;">${contactBlock.join('<br/>')}</div>`;
     }
-    return formattedContent;
+    return html;
   };
 
   const loadCV = async () => {
@@ -991,14 +1017,14 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
               style={highlightEducation ? { transition: 'background 0.5s', background: '#fffbe6', borderRadius: '6px', boxShadow: '0 0 0 2px #ffe066' } : {}}
               dangerouslySetInnerHTML={{ __html: formatCVContent(cvData.content) }}
             />
-            
-            {showPdfPreview && pdfUrl && (
+            {/* PDF Viewer: Show actual PDF visually if the file is a PDF */}
+            {cvData && cvData.filename && cvData.filename.toLowerCase().endsWith('.pdf') && (
               <div style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
                 <div style={{ padding: '10px', background: '#f8f9fa', borderBottom: '1px solid #ddd', fontWeight: 'bold' }}>
                   📄 PDF Preview
                 </div>
                 <iframe
-                  src={pdfUrl}
+                  src="http://localhost:8081/cv/pdf-preview"
                   style={{ width: '100%', height: '600px', border: 'none' }}
                   title="CV PDF Preview"
                 />

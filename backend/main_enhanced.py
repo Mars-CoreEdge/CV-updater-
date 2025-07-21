@@ -781,7 +781,7 @@ def extract_text_from_file(file: UploadFile) -> str:
                 extracted_text = content.decode('utf-8')
             except UnicodeDecodeError:
                 try:
-                    extracted_text = content.decode('latin-1')
+                    extracted_text = content.decode('utf-8')
                 except UnicodeDecodeError:
                     extracted_text = content.decode('utf-8', errors='ignore')
         else:
@@ -831,8 +831,8 @@ def clean_cv_text(text: str) -> str:
     for unicode_char, replacement in unicode_replacements.items():
         cleaned_text = cleaned_text.replace(unicode_char, replacement)
     
-    # Remove other problematic Unicode characters that can't be encoded in latin-1
-    cleaned_text = ''.join(char for char in cleaned_text if ord(char) < 256 or char in '•')
+    # Remove other problematic Unicode characters that can't be encoded in utf-8
+    # cleaned_text = ''.join(char for char in cleaned_text if ord(char) < 256 or char in '•')
     
     # Normalize Unicode characters
     cleaned_text = unicodedata.normalize('NFKC', cleaned_text)
@@ -2634,7 +2634,7 @@ async def upload_cv_for_projects(
                     cv_text = content.decode('utf-8')
                 except UnicodeDecodeError:
                     try:
-                        cv_text = content.decode('latin-1')
+                        cv_text = content.decode('utf-8')
                     except UnicodeDecodeError:
                         cv_text = content.decode('utf-8', errors='ignore')
             else:
@@ -4497,9 +4497,7 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
                     sections.append([line])
         
         if current_section:
-            sections.append(current_section)
-        
-        # Add modern header with name
+            sections.append(current_section)          
         story.append(Paragraph(name, header_style))
         
         # Add contact information in a clean format

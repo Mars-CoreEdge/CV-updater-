@@ -820,23 +820,6 @@ function ProjectsPage() {
   });
   const [techInput, setTechInput] = useState('');
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  // Reload projects when component becomes visible (when navigating back to this page)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('Projects page became visible, reloading projects...');
-        loadProjects();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
-
   // Test backend connectivity first
   const testBackendConnection = async () => {
     try {
@@ -931,6 +914,22 @@ function ProjectsPage() {
       setIsLoading(false);
     }
   };
+
+  // Move useEffect hooks that reference loadProjects below the loadProjects function definition
+  useEffect(() => {
+    loadProjects();
+  }, []); // Only run once on mount
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Projects page became visible, reloading projects...');
+        loadProjects();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []); // Only run once on mount
 
   const getTotalTechnologies = () => {
     const allTechs = projects.flatMap(project => project.technologies || []);
@@ -1065,41 +1064,18 @@ function ProjectsPage() {
     }
   };
 
-  const handleDownloadCV = async () => {
-    try {
-      const response = await axios.post('http://localhost:8081/cv/download', {}, {
-        responseType: 'blob'
-      });
-      
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `cv_with_projects_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download error:', error);
-      alert('Error downloading CV. Please try again.');
-    }
-  };
-
   const handleDownloadCVWithSelectedProjects = async () => {
     if (selectedProjects.length === 0) {
       alert('Please select at least one project to include in your CV.');
       return;
     }
-
     try {
       setAssistantActionLoading('downloading');
-      const response = await axios.post('http://localhost:8081/cv/download-with-selected-projects', {
-        selected_project_ids: selectedProjects
-      }, {
-        responseType: 'blob'
-      });
-      
+      const response = await axios.post(
+        'http://localhost:8081/cv/download-with-selected-projects',
+        selectedProjects, // send as array
+        { responseType: 'blob' }
+      );
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -1571,6 +1547,8 @@ function ProjectsPage() {
         onProjectUpdate={handleProjectUpdate}
         onProjectDelete={handleProjectDelete}
         onProjectsReload={loadProjects}
+        selectedProjects={selectedProjects}
+        handleDownloadCVWithSelectedProjects={handleDownloadCVWithSelectedProjects}
       />
     </PageContainer>
   );
