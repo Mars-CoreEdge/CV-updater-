@@ -141,8 +141,10 @@ def is_project_title(line: str) -> bool:
     # Project titles typically:
     # - Start with capital letters
     # - Don't end with ':'
-    # - Are not too long (usually 2-6 words)
+    # - Are not too long (usually 1-8 words)
     # - Don't contain typical bullet point indicators
+    # - Are not just technology names or generic terms
+    # - Are not separator lines or formatting elements
     
     if not line or line.startswith('-') or line.startswith('•'):
         return False
@@ -150,18 +152,31 @@ def is_project_title(line: str) -> bool:
     if line.endswith(':'):
         return False
     
+    # Exclude separator lines and formatting elements
+    if re.match(r'^[_\-\=]+$', line.strip()):  # Lines with only underscores, dashes, or equals
+        return False
+    
+    # Exclude lines that are just repeated characters
+    if len(set(line.strip())) <= 2 and len(line.strip()) > 10:
+        return False
+    
     # Check if it looks like a project title
     words = line.split()
-    if len(words) < 1 or len(words) > 10:  # More flexible word count
+    if len(words) < 1 or len(words) > 8:  # Allow single words for project names like "JobMatch"
         return False
     
     # Check if it starts with capital letters
     if not line[0].isupper():
         return False
     
-    # Check for common project title patterns
-    project_indicators = ['app', 'platform', 'system', 'dashboard', 'website', 'tool', 'application', 'portal', 'management']
+    # Exclude common non-project terms
+    exclude_terms = ['technologies', 'tools', 'languages', 'frameworks', 'databases', 'platforms', 'services', 'apis', 'libraries']
     line_lower = line.lower()
+    if any(term in line_lower for term in exclude_terms):
+        return False
+    
+    # Check for common project title patterns
+    project_indicators = ['app', 'platform', 'system', 'dashboard', 'website', 'tool', 'application', 'portal', 'management', 'project', 'solution', 'service']
     
     # If it contains project indicators, it's likely a title
     if any(indicator in line_lower for indicator in project_indicators):
@@ -171,8 +186,18 @@ def is_project_title(line: str) -> bool:
     if re.search(r'\[\s*\d{4}\s*[-–]\s*(?:Present|\d{4})\s*\]', line):
         return True
     
+    # For single words, check if they look like project names (camelCase, PascalCase, or compound words)
+    if len(words) == 1:
+        word = words[0]
+        # Check for camelCase or PascalCase (common in project names)
+        if re.match(r'^[A-Z][a-z]+[A-Z][a-zA-Z]*$', word):  # PascalCase like JobMatch
+            return True
+        # Check for compound words or words that look like project names
+        if len(word) > 5 and word[0].isupper():  # Longer words starting with capital
+            return True
+    
     # If it's a short line (likely a title) and not a bullet point
-    if len(line.strip()) < 50 and not line.strip().startswith(('-', '•', '[')):
+    if len(line.strip()) < 40 and not line.strip().startswith(('-', '•', '[')):
         return True
     
     return False
@@ -216,6 +241,15 @@ def parse_project_block(block: str) -> Optional[Dict]:
     role = extract_role(block)
     if role:
         project['role'] = role
+    
+    # Only return project if it has meaningful content
+    # Must have either description, highlights, or technologies
+    if not project['description'] and not project['highlights'] and not project['technologies']:
+        return None
+    
+    # Must have a valid title (not empty)
+    if not project['title'] or len(project['title'].strip()) == 0:
+        return None
     
     return project
 
@@ -280,25 +314,33 @@ def extract_description_and_highlights(text: str) -> tuple[str, List[str]]:
     
     lines = text.split('\n')
     
+    # Skip the first line (title)
+    content_lines = [line.strip() for line in lines[1:] if line.strip()]
+    
     # Look for bullet points (highlights)
-    for line in lines:
-        line = line.strip()
+    for line in content_lines:
         if line.startswith('-') or line.startswith('•'):
             highlight = line.lstrip('-•').strip()
             if highlight:
                 highlights.append(highlight)
     
-    # If we have highlights, use the first one as description
-    if highlights:
-        description = highlights[0]
-        highlights = highlights[1:]  # Rest are highlights
+    # Find description from non-bullet lines
+    non_bullet_lines = [line for line in content_lines 
+                       if line and not line.startswith(('-', '•', '['))]
     
-    # If no highlights, try to extract description from non-bullet lines
-    if not description:
-        non_bullet_lines = [line.strip() for line in lines 
-                           if line.strip() and not line.strip().startswith(('-', '•', '['))]
-        if non_bullet_lines:
-            description = non_bullet_lines[0]
+    if non_bullet_lines:
+        # Use the first meaningful line as description
+        description = non_bullet_lines[0]
+        
+        # If we have highlights, use the first highlight as description if no description found
+        if not description and highlights:
+            description = highlights[0]
+            highlights = highlights[1:]  # Rest are highlights
+    
+    # If still no description but we have highlights, use first highlight
+    if not description and highlights:
+        description = highlights[0]
+        highlights = highlights[1:]
     
     return description, highlights
 

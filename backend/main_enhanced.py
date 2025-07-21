@@ -16,8 +16,9 @@ import json
 import threading
 import io
 from contextlib import contextmanager
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
+from contextlib import asynccontextmanager
 
 # Import database connection
 try:
@@ -306,37 +307,54 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
     """
     # Clean the CV content before generating PDF
     cv_content = clean_cv_text(cv_content)
-    
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
-    
-    # Set fonts (fallback to default if custom fonts not available)
+
+    # Always use a Unicode font for non-ASCII characters
+    use_custom_font = False
     try:
         pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
         pdf.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf', uni=True)
         use_custom_font = True
-    except:
+    except Exception as e:
+        print(f"Warning: Could not load DejaVu font: {e}. Falling back to Arial.")
         use_custom_font = False
-    
+        # ASCII fallback: replace common non-ASCII characters with ASCII equivalents
+        replacements = {
+            '\u2022': '-',  # bullet
+            '\u2023': '-',  # triangular bullet
+            '\u25E6': '-',  # white bullet
+            '\u2043': '-',  # hyphen bullet
+            '\u2219': '-',  # bullet operator
+            '\u2013': '-',  # en dash
+            '\u2014': '-',  # em dash
+            '\uf0b7': '-',  # another bullet
+        }
+        for uni, ascii_char in replacements.items():
+            cv_content = cv_content.replace(unicode_char, ascii_char)
+        # Also replace any other non-ASCII chars with '?'
+        cv_content = cv_content.encode('ascii', errors='replace').decode('ascii')
+
     # Parse CV content
     lines = cv_content.split('\n')
-    
+
     # Extract name and title (first few lines)
     name = ""
     title = ""
     contact_info = []
-    
+
     for i, line in enumerate(lines[:10]):
         line = line.strip()
-        if line and not re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', line):
+        if line and not re.match(r'^[_\-\=\s]*[A-Z][A-Z\s&]+[_\-\=\s]*$', line):
             if not name:
                 name = line
             elif not title and len(line) < 50:
                 title = line
-            elif '@' in line or re.match(r'^[\+]?[0-9\-\s\(\)]+$', line) or 'www.' in line:
+            elif '@' in line or re.match(r'^[\+]?\d', line) or 'www.' in line:
                 contact_info.append(line)
-    
+
     # Header section
     if name:
         if use_custom_font:
@@ -344,14 +362,14 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
         else:
             pdf.set_font('Arial', 'B', 20)
         pdf.cell(0, 10, name, ln=True, align='C')
-    
+
     if title:
         if use_custom_font:
             pdf.set_font('DejaVu', '', 14)
         else:
             pdf.set_font('Arial', '', 14)
         pdf.cell(0, 8, title, ln=True, align='C')
-    
+
     # Contact info
     if contact_info:
         if use_custom_font:
@@ -360,45 +378,49 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
             pdf.set_font('Arial', '', 10)
         for contact in contact_info:
             pdf.cell(0, 6, contact, ln=True, align='C')
-    
+
     pdf.ln(10)
-    
-    # Process sections
-    current_section = None
-    section_content = []
-    
+
+    # Improved section/heading detection and decoration
+    section_keywords = ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS', 'ABOUT', 'CERTIFICATIONS', 'ACHIEVEMENTS', 'CONTACT']
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
-        # Check if this is a section header
-        is_header = False
-        for section_name, patterns in SECTION_PATTERNS.items():
-            for pattern in patterns:
-                if re.match(pattern, line.upper(), re.IGNORECASE):
-                    # Process previous section
-                    if current_section and section_content:
-                        _write_section_to_pdf(pdf, current_section, section_content, use_custom_font)
-                    
-                    # Start new section
-                    current_section = section_name
-                    section_content = []
-                    is_header = True
-                    break
-            if is_header:
-                break
-        
-        if not is_header and current_section:
-            section_content.append(line)
-    
-    # Process last section
-    if current_section and section_content:
-        _write_section_to_pdf(pdf, current_section, section_content, use_custom_font)
-    
+        # Detect section headers: all uppercase and longer than 3 chars, or contains section keyword
+        is_header = (
+            (line.isupper() and len(line) > 3) or
+            any(kw in line.upper() for kw in section_keywords)
+        )
+        if is_header:
+            pdf.ln(6)  # Extra space before section
+            if use_custom_font:
+                pdf.set_font('DejaVu', 'B', 14)
+            else:
+                pdf.set_font('Arial', 'B', 14)
+            pdf.set_fill_color(230, 236, 245)
+            pdf.cell(0, 10, line.title(), ln=True, fill=True)
+            pdf.ln(2)
+        else:
+            # Bullet points
+            if line.startswith('-') or line.startswith('*'):
+                pdf.set_x(20)
+                if use_custom_font:
+                    pdf.set_font('DejaVu', '', 10)
+                else:
+                    pdf.set_font('Arial', '', 10)
+                pdf.cell(0, 8, line, ln=True)
+            else:
+                if use_custom_font:
+                    pdf.set_font('DejaVu', '', 10)
+                else:
+                    pdf.set_font('Arial', '', 10)
+                pdf.multi_cell(0, 8, line)
+
     # Return PDF as bytes
     pdf_bytes = BytesIO()
-    pdf.output(pdf_bytes, 'S')
+    pdf_output = pdf.output(dest='S').encode('latin1') if not use_custom_font else pdf.output(dest='S').encode('utf-8', errors='replace')
+    pdf_bytes.write(pdf_output)
     pdf_bytes.seek(0)
     return pdf_bytes
 
@@ -499,7 +521,17 @@ else:
         print(f"❌ Failed to initialize OpenAI client: {e}")
         openai_client = None
 
-app = FastAPI(title="CV Updater Chatbot with OpenAI", version="2.0.0")
+class ProjectSelectionRequest(BaseModel):
+    selected_project_ids: List[int]
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code here
+    init_db()
+    yield
+    # (Optional) Shutdown code here
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -3515,6 +3547,10 @@ async def create_project_from_chat(request: ChatProjectRequest):
                           (json.dumps(project_data),))
             project_id = cursor.lastrowid
             
+            # Update CV content after adding project
+            updated_cv = generate_cv_with_projects(cursor, conn)
+            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+            
             return {
                 "success": True,
                 "message": f"Successfully created project '{project_data['title']}'",
@@ -3656,6 +3692,10 @@ async def create_project(project: ProjectRequest):
             cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
                           (json.dumps(project_data),))
             project_id = cursor.lastrowid
+            
+            # Update CV content after adding project
+            updated_cv = generate_cv_with_projects(cursor, conn)
+            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
             
             # Add ID to returned project data
             project_with_id = {**project_data, "id": project_id}
@@ -4323,138 +4363,55 @@ def reorganize_cv_content(cv_content: str) -> str:
         return cv_content
 
 def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
-    """Generate a modern, professional PDF using ReportLab 4.4.2"""
+    """Generate a modern, professional PDF using ReportLab"""
     buffer = BytesIO()
-    
     try:
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, KeepTogether
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY, TA_RIGHT
-        from reportlab.lib.colors import HexColor, black, white, Color
-        from reportlab.lib.units import inch, cm, mm
-        from reportlab.pdfgen import canvas
-        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+        from reportlab.lib.colors import HexColor, black, white
+        from reportlab.lib.units import inch
         
-        # Create PDF document with modern margins
-        doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                              rightMargin=25*mm, leftMargin=25*mm,
-                              topMargin=30*mm, bottomMargin=25*mm)
+        # Create PDF document
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
         
-        # Get default styles
+        # Get base styles
         styles = getSampleStyleSheet()
         
-        # Modern color scheme
-        primary_color = HexColor('#1a365d')      # Dark blue
-        accent_color = HexColor('#3182ce')       # Blue
-        secondary_color = HexColor('#4a5568')    # Gray
-        light_gray = HexColor('#f7fafc')         # Light gray
-        success_color = HexColor('#38a169')      # Green
-        warning_color = HexColor('#d69e2e')      # Yellow
+        # Define custom styles
+        accent_color = HexColor('#667eea')
         
-        # Enhanced typography styles for ReportLab 4.4.2
         header_style = ParagraphStyle(
-            'ModernHeader',
-            parent=styles['Heading1'],
-            fontSize=32,
-            spaceAfter=35,
-            alignment=TA_CENTER,
-            textColor=primary_color,
-            fontName='Helvetica-Bold',
-            spaceBefore=0,
-            leading=38
-        )
-        
-        section_style = ParagraphStyle(
-            'ModernSection',
-            parent=styles['Heading2'],
-            fontSize=18,
-            spaceAfter=15,
-            spaceBefore=30,
-            textColor=primary_color,
-            fontName='Helvetica-Bold',
-            borderWidth=0,
-            borderPadding=0,
-            leftIndent=0,
-            leading=22
-        )
-        
-        body_style = ParagraphStyle(
-            'ModernBody',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=8,
-            alignment=TA_JUSTIFY,
-            fontName='Helvetica',
-            textColor=HexColor('#2d3748'),
-            leading=16,
-            firstLineIndent=0
-        )
-        
-        bullet_style = ParagraphStyle(
-            'ModernBullet',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=6,
-            leftIndent=20,
-            fontName='Helvetica',
-            textColor=HexColor('#2d3748'),
-            leading=16,
-            firstLineIndent=0
+            'Header', parent=styles['Heading1'], fontSize=24, spaceAfter=12, alignment=TA_CENTER, textColor=accent_color
         )
         
         contact_style = ParagraphStyle(
-            'ModernContact',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=5,
-            alignment=TA_CENTER,
-            fontName='Helvetica',
-            textColor=secondary_color,
-            leading=16
+            'Contact', parent=styles['Normal'], fontSize=10, spaceAfter=20, alignment=TA_CENTER, textColor=black
         )
         
-        # Enhanced styles for different content types
+        section_style = ParagraphStyle(
+            'Section', parent=styles['Heading2'], fontSize=16, spaceAfter=12, spaceBefore=20, textColor=accent_color
+        )
+        
         job_title_style = ParagraphStyle(
-            'JobTitle',
-            parent=styles['Normal'],
-            fontSize=14,
-            spaceAfter=4,
-            fontName='Helvetica-Bold',
-            textColor=accent_color,
-            leading=18
-        )
-        
-        company_style = ParagraphStyle(
-            'Company',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=2,
-            fontName='Helvetica-Bold',
-            textColor=secondary_color,
-            leading=16
+            'JobTitle', parent=styles['Heading3'], fontSize=14, spaceAfter=6, textColor=black
         )
         
         date_style = ParagraphStyle(
-            'Date',
-            parent=styles['Normal'],
-            fontSize=11,
-            spaceAfter=8,
-            fontName='Helvetica',
-            textColor=secondary_color,
-            leading=14,
-            alignment=TA_RIGHT
+            'Date', parent=styles['Normal'], fontSize=10, spaceAfter=8, textColor=accent_color
+        )
+        
+        body_style = ParagraphStyle(
+            'Body', parent=styles['Normal'], fontSize=11, spaceAfter=8, alignment=TA_JUSTIFY
         )
         
         skill_style = ParagraphStyle(
-            'Skill',
-            parent=styles['Normal'],
-            fontSize=12,
-            spaceAfter=4,
-            fontName='Helvetica',
-            textColor=HexColor('#2d3748'),
-            leading=16,
-            leftIndent=20
+            'Skill', parent=styles['Normal'], fontSize=10, spaceAfter=6, textColor=accent_color
+        )
+        
+        bullet_style = ParagraphStyle(
+            'Bullet', parent=styles['Normal'], fontSize=10, spaceAfter=4, leftIndent=20
         )
         
         # Build PDF content
@@ -4462,8 +4419,6 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
         
         # Parse CV content
         lines = cv_content.split('\n')
-        
-        # Extract name and contact info
         name = "PROFESSIONAL CV"
         contact_info = []
         sections = []
@@ -4473,20 +4428,13 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
             line = line.strip()
             if not line:
                 continue
-                
-            # Skip formatting artifacts
             if line.startswith('📋') or '─' in line or line.startswith('='):
                 continue
-                
-            # First non-empty line is usually the name
             if i == 0 and not any(keyword in line.upper() for keyword in ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS']):
                 name = line.upper()
             elif '@' in line or 'http' in line or any(char.isdigit() for char in line):
-                # Contact information
                 contact_info.append(line)
-            elif (line.isupper() and len(line) > 3) or any(keyword in line.upper() for keyword in 
-                ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS', 'ABOUT']):
-                # Section header
+            elif (line.isupper() and len(line) > 3) or any(keyword in line.upper() for keyword in ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS', 'ABOUT']):
                 if current_section:
                     sections.append(current_section)
                 current_section = [line]
@@ -4497,154 +4445,144 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
                     sections.append([line])
         
         if current_section:
-            sections.append(current_section)          
-        story.append(Paragraph(name, header_style))
+            sections.append(current_section)
         
-        # Add contact information in a clean format
+        # Add header
+        story.append(Paragraph(name, header_style))
         if contact_info:
             contact_text = " | ".join(contact_info)
             story.append(Paragraph(contact_text, contact_style))
-        
         story.append(Spacer(1, 25))
         
-        # Add a professional divider
+        # Add divider
         divider_style = ParagraphStyle(
-            'Divider',
-            parent=styles['Normal'],
-            fontSize=2,
-            spaceAfter=25,
-            spaceBefore=25,
-            alignment=TA_CENTER,
-            textColor=accent_color
+            'Divider', parent=styles['Normal'], fontSize=2, spaceAfter=25, spaceBefore=25, alignment=TA_CENTER, textColor=accent_color
         )
         story.append(Paragraph("_" * 60, divider_style))
         
-        # Process sections with enhanced formatting
+        # Process sections
+        inserted_projects = False
         for section in sections:
             if not section:
                 continue
-                
             section_title = section[0]
             section_content = section[1:] if len(section) > 1 else []
             
-            # Add section header with enhanced styling
-            section_text = section_title.replace('_', ' ').title()
-            story.append(Paragraph(section_text, section_style))
-            
-            # Add subtle underline for section
+            if 'PROJECTS' in section_title.upper():
+                if projects and len(projects) > 0:
+                    # Replace this section with the selected projects
+                    story.append(Paragraph('Projects', section_style))
+                    underline_style = ParagraphStyle(
+                        'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=20, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
+                    )
+                    story.append(Paragraph("_" * 50, underline_style))
+                    
+                    for i, project in enumerate(projects, 1):
+                        title = project.get('title', f'Project {i}')
+                        duration = project.get('duration', '')
+                        description = project.get('description', '')
+                        technologies = project.get('technologies', [])
+                        highlights = project.get('highlights', [])
+                        
+                        story.append(Paragraph(f"{i}. {title}", job_title_style))
+                        if duration:
+                            story.append(Paragraph(f"Duration: {duration}", date_style))
+                        if description:
+                            story.append(Paragraph(f"{description}", body_style))
+                        if technologies:
+                            tech_str = ', '.join(technologies) if isinstance(technologies, list) else str(technologies)
+                            story.append(Paragraph(f"Technologies: {tech_str}", skill_style))
+                        if highlights:
+                            story.append(Paragraph("Key Highlights:", body_style))
+                            if isinstance(highlights, list):
+                                for highlight in highlights:
+                                    story.append(Paragraph(f"• {highlight}", bullet_style))
+                            else:
+                                story.append(Paragraph(f"• {highlights}", bullet_style))
+                        story.append(Spacer(1, 8))
+                    story.append(Spacer(1, 15))
+                    inserted_projects = True
+                # If projects are provided, skip the original section_content
+                continue
+            else:
+                # Add other sections
+                section_text = section_title.replace('_', ' ').title()
+                story.append(Paragraph(section_text, section_style))
+                underline_style = ParagraphStyle(
+                    'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=20, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
+                )
+                story.append(Paragraph("_" * 50, underline_style))
+                
+                for line in section_content:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith('•') or line.startswith('-') or line.startswith('*'):
+                        clean_line = line[1:].strip()
+                        if clean_line:
+                            story.append(Paragraph(f"• {clean_line}", bullet_style))
+                    elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.'):
+                        story.append(Paragraph(line, bullet_style))
+                    elif ':' in line and len(line.split(':')) == 2:
+                        key, value = line.split(':', 1)
+                        if key.strip() and value.strip():
+                            story.append(Paragraph(f"<b>{key.strip()}:</b> {value.strip()}", body_style))
+                        else:
+                            story.append(Paragraph(line, body_style))
+                    else:
+                        if line and not line.startswith('Generated on'):
+                            story.append(Paragraph(line, body_style))
+                story.append(Spacer(1, 15))
+        # If there was no projects section but projects are provided, add it at the end
+        if projects and len(projects) > 0 and not inserted_projects:
+            story.append(Paragraph('Projects', section_style))
             underline_style = ParagraphStyle(
-                'Underline',
-                parent=styles['Normal'],
-                fontSize=1,
-                spaceAfter=20,
-                spaceBefore=0,
-                alignment=TA_LEFT,
-                textColor=accent_color
+                'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=20, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
             )
             story.append(Paragraph("_" * 50, underline_style))
-            
-            # Process section content with smart formatting
-            for line in section_content:
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # Handle different content types
-                if line.startswith('•') or line.startswith('-') or line.startswith('*'):
-                    # Bullet points
-                    clean_line = line[1:].strip()
-                    if clean_line:
-                        story.append(Paragraph(f"• {clean_line}", bullet_style))
-                        
-                elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.'):
-                    # Numbered list
-                    story.append(Paragraph(line, bullet_style))
-                    
-                elif '|' in line and len(line.split('|')) >= 2:
-                    # Job entries with company and date
-                    parts = line.split('|')
-                    if len(parts) >= 3:
-                        job_title = parts[0].strip()
-                        company = parts[1].strip()
-                        date = parts[2].strip()
-                        
-                        # Create a table for job entries
-                        job_data = [[job_title, date]]
-                        job_table = Table(job_data, colWidths=[doc.width*0.7, doc.width*0.3])
-                        job_table.setStyle(TableStyle([
-                            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-                            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-                            ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
-                            ('FONTSIZE', (0, 0), (0, 0), 14),
-                            ('TEXTCOLOR', (0, 0), (0, 0), accent_color),
-                            ('FONTNAME', (1, 0), (1, 0), 'Helvetica'),
-                            ('FONTSIZE', (1, 0), (1, 0), 11),
-                            ('TEXTCOLOR', (1, 0), (1, 0), secondary_color),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                        ]))
-                        story.append(job_table)
-                        
-                        # Add company name
-                        if company:
-                            story.append(Paragraph(company, company_style))
-                        story.append(Spacer(1, 8))
-                        
+            for i, project in enumerate(projects, 1):
+                title = project.get('title', f'Project {i}')
+                duration = project.get('duration', '')
+                description = project.get('description', '')
+                technologies = project.get('technologies', [])
+                highlights = project.get('highlights', [])
+                story.append(Paragraph(f"{i}. {title}", job_title_style))
+                if duration:
+                    story.append(Paragraph(f"Duration: {duration}", date_style))
+                if description:
+                    story.append(Paragraph(f"{description}", body_style))
+                if technologies:
+                    tech_str = ', '.join(technologies) if isinstance(technologies, list) else str(technologies)
+                    story.append(Paragraph(f"Technologies: {tech_str}", skill_style))
+                if highlights:
+                    story.append(Paragraph("Key Highlights:", body_style))
+                    if isinstance(highlights, list):
+                        for highlight in highlights:
+                            story.append(Paragraph(f"• {highlight}", bullet_style))
                     else:
-                        story.append(Paragraph(line, body_style))
-                        
-                elif ':' in line and len(line.split(':')) == 2:
-                    # Key-value pairs
-                    key, value = line.split(':', 1)
-                    if key.strip() and value.strip():
-                        story.append(Paragraph(f"<b>{key.strip()}:</b> {value.strip()}", body_style))
-                    else:
-                        story.append(Paragraph(line, body_style))
-                        
-                else:
-                    # Regular content
-                    if line and not line.startswith('Generated on'):
-                        story.append(Paragraph(line, body_style))
-            
-            # Add spacing between sections
+                        story.append(Paragraph(f"• {highlights}", bullet_style))
+                story.append(Spacer(1, 8))
             story.append(Spacer(1, 15))
         
-        # Add modern footer with enhanced styling
+        # Add footer
         story.append(Spacer(1, 40))
         footer_style = ParagraphStyle(
-            'ModernFooter',
+            'Footer',
             parent=styles['Normal'],
             fontSize=10,
             alignment=TA_CENTER,
-            textColor=secondary_color,
-            fontName='Helvetica',
-            leading=12
+            textColor=accent_color,
         )
+        story.append(Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y')}", footer_style))
         
-        footer_text = f"Generated on {datetime.now().strftime('%B %d, %Y')} | CV Updater Platform"
-        story.append(Paragraph(footer_text, footer_style))
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        return buffer
         
-        # Build PDF with enhanced error handling
-        try:
-            doc.build(story)
-            buffer.seek(0)
-            print("✅ Modern professional PDF generated successfully with ReportLab 4.4.2")
-            return buffer
-        except Exception as build_error:
-            print(f"PDF build error: {build_error}")
-            # Fallback to simpler build
-            simple_story = [Paragraph(name, header_style)]
-            simple_story.append(Spacer(1, 20))
-            simple_story.append(Paragraph(cv_content, body_style))
-            doc.build(simple_story)
-            buffer.seek(0)
-            return buffer
-        
-    except ImportError as import_error:
-        print(f"ReportLab import error: {import_error}")
-        print("ReportLab not available, using enhanced text fallback")
-        return generate_cv_text_fallback_enhanced(cv_content, buffer)
     except Exception as e:
-        print(f"ReportLab PDF generation failed: {e}, using enhanced text fallback")
+        print(f"Error generating PDF: {e}")
+        # Fallback to simple text PDF
         return generate_cv_text_fallback_enhanced(cv_content, buffer)
 
 def generate_cv_text_fallback_enhanced(cv_content: str, buffer: BytesIO) -> BytesIO:
@@ -4810,11 +4748,12 @@ async def download_cv():
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
 
 @app.post("/cv/download-with-selected-projects")
-async def download_cv_with_selected_projects(selected_project_ids: List[int]):
-    """Download CV with only selected projects as PDF"""
+async def download_cv_with_selected_projects(request: ProjectSelectionRequest):
+    selected_project_ids = request.selected_project_ids
     try:
         with get_db_cursor_context() as (cursor, conn):
-            # Get current CV content
+            # Always update CV before download
+            updated_cv = generate_cv_with_projects(cursor, conn)
             cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
             cv_row = cursor.fetchone()
             
@@ -4833,8 +4772,11 @@ async def download_cv_with_selected_projects(selected_project_ids: List[int]):
                     try:
                         project_data = json.loads(row[0])
                         selected_projects.append(project_data)
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"Error parsing project data: {e}")
+                        continue
+            
+            print(f"Selected {len(selected_projects)} projects for CV download")
             
             # Generate PDF with selected projects
             pdf_buffer = generate_cv_pdf(cv_content, selected_projects)
@@ -4849,6 +4791,8 @@ async def download_cv_with_selected_projects(selected_project_ids: List[int]):
         raise
     except Exception as e:
         print(f"❌ Download error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 @app.post("/projects/create-linkedin-blog")
@@ -4891,6 +4835,8 @@ async def get_cv_pdf_preview():
     """Get CV as PDF for preview (not download)."""
     try:
         with get_db_cursor_context() as (cursor, conn):
+            # Always update CV before preview
+            updated_cv = generate_cv_with_projects(cursor, conn)
             cursor.execute("SELECT current_content FROM cvs WHERE is_active = TRUE LIMIT 1")
             cv_row = cursor.fetchone()
             

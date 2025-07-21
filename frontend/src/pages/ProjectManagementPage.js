@@ -528,6 +528,8 @@ function ProjectManagementPage() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const messagesEndRef = useRef(null);
   
+  const [selectedProjects, setSelectedProjects] = useState([]); // <-- Add this state
+  
   const navigate = useNavigate();
   const { theme } = useTheme();
 
@@ -844,6 +846,71 @@ function ProjectManagementPage() {
     }
   };
 
+  // Checkbox handler
+  const handleProjectSelection = (projectId) => {
+    setSelectedProjects(prev => {
+      if (prev.includes(projectId)) {
+        return prev.filter(id => id !== projectId);
+      } else {
+        return [...prev, projectId];
+      }
+    });
+  };
+
+  // Download CV with only selected projects
+  const handleDownloadCVWithSelectedProjects = async () => {
+    if (selectedProjects.length === 0) {
+      alert('Please select at least one project to include in your CV.');
+      return;
+    }
+    try {
+      console.log('🔄 Downloading CV with selected projects:', selectedProjects);
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/cv/download-with-selected-projects`,
+        { selected_project_ids: selectedProjects }, // send as object
+        { responseType: 'blob' }
+      );
+      
+      console.log('✅ Download response received, size:', response.data.size);
+      
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Received empty PDF data');
+      }
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cv_selected_projects_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('✅ PDF download completed successfully');
+    } catch (error) {
+      console.error('❌ Download error:', error);
+      console.error('Error response:', error.response);
+      
+      let errorMessage = 'Error downloading CV with selected projects. ';
+      
+      if (error.response?.status === 404) {
+        errorMessage += 'No active CV found. Please upload a CV first.';
+      } else if (error.response?.status === 422) {
+        errorMessage += 'Invalid project selection. Please try again.';
+      } else if (error.response?.status >= 500) {
+        errorMessage += 'Server error. Please try again later.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage += 'Cannot connect to server. Please ensure the backend is running.';
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      alert(errorMessage);
+    }
+  };
+
   return (
     <PageContainer theme={theme}>
       <ContentWrapper>
@@ -888,7 +955,17 @@ function ProjectManagementPage() {
                 <ProjectsGrid>
                   {projects.map((project, index) => (
                     <ProjectCard key={project.id || index} theme={theme}>
-                      <ProjectTitle theme={theme}>{project.title}</ProjectTitle>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <ProjectTitle theme={theme}>{project.title}</ProjectTitle>
+                        {/* Checkbox for selection */}
+                        <input
+                          type="checkbox"
+                          checked={selectedProjects.includes(project.id)}
+                          onChange={() => handleProjectSelection(project.id)}
+                          title="Select this project for CV inclusion"
+                          style={{ width: 18, height: 18 }}
+                        />
+                      </div>
                       <ProjectDescription theme={theme}>{project.description}</ProjectDescription>
                       
                       {project.technologies && project.technologies.length > 0 && (
@@ -919,6 +996,16 @@ function ProjectManagementPage() {
                   ))}
                 </ProjectsGrid>
               )}
+              {/* Download button for selected projects */}
+              <Button
+                theme={theme}
+                variant="primary"
+                onClick={handleDownloadCVWithSelectedProjects}
+                disabled={selectedProjects.length === 0}
+                style={{ marginTop: 20 }}
+              >
+                Download CV (Selected Projects)
+              </Button>
             </ProjectsContainer>
           </LeftPanel>
 

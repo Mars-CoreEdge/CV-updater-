@@ -1014,7 +1014,7 @@ function ProjectsPage() {
         highlights: formData.highlights.filter(h => h.trim())
       };
       
-      const response = await axios.post('http://localhost:8081/projects/', projectData);
+      const response = await axios.post('http://localhost:8081/projects/create', projectData);
       
       // Reload projects from backend to get fresh data with IDs
       await loadProjects();
@@ -1071,11 +1071,20 @@ function ProjectsPage() {
     }
     try {
       setAssistantActionLoading('downloading');
+      console.log('🔄 Downloading CV with selected projects:', selectedProjects);
+      
       const response = await axios.post(
         'http://localhost:8081/cv/download-with-selected-projects',
-        selectedProjects, // send as array
+        { selected_project_ids: selectedProjects }, // send as object
         { responseType: 'blob' }
       );
+      
+      console.log('✅ Download response received, size:', response.data.size);
+      
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Received empty PDF data');
+      }
+      
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -1085,9 +1094,27 @@ function ProjectsPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      console.log('✅ PDF download completed successfully');
     } catch (error) {
-      console.error('Download error:', error);
-      alert('Error downloading CV with selected projects. Please try again.');
+      console.error('❌ Download error:', error);
+      console.error('Error response:', error.response);
+      
+      let errorMessage = 'Error downloading CV with selected projects. ';
+      
+      if (error.response?.status === 404) {
+        errorMessage += 'No active CV found. Please upload a CV first.';
+      } else if (error.response?.status === 422) {
+        errorMessage += 'Invalid project selection. Please try again.';
+      } else if (error.response?.status >= 500) {
+        errorMessage += 'Server error. Please try again later.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage += 'Cannot connect to server. Please ensure the backend is running.';
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      alert(errorMessage);
     } finally {
       setAssistantActionLoading('');
     }

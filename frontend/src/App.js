@@ -913,6 +913,7 @@ function CVUpdaterContent() {
               </ModernCard>
               
               {/* Debug Panel - Only show in development */}
+              {/*
               {process.env.NODE_ENV === 'development' && (
                 <ModernCard style={{marginTop: '20px'}}>
                   <div style={{ padding: '15px' }}>
@@ -926,6 +927,7 @@ function CVUpdaterContent() {
                   </div>
                 </ModernCard>
               )}
+              */}
             </RightPanel>
           </MainContent>
         </ContentWrapper>

@@ -599,7 +599,7 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
       }
       // Render name as big heading (only first non-empty line)
       if (!nameRendered) {
-        html += `<div style="text-align:center;margin:18px 0 8px 0;"><h1 style="margin:0;font-size:2.1rem;font-weight:800;letter-spacing:0.01em;">${line}</h1></div>`;
+        html += `<div style="text-align:center;margin:18px 0 8px 0;"><h1 style="margin:0;font-size:1rem;font-weight:200;letter-spacing:0.1rem;">${line}</h1></div>`;
         nameRendered = true;
         lastWasSection = false;
         continue;
@@ -619,10 +619,19 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
           html += '</ul>';
           inList = false;
         }
-        if (lastWasSection) {
-          html += '<hr style="border:none;border-top:1.5px solid #e0e4ef;margin:32px 0 24px 0;">';
-        }
-        html += `<h2 style="text-align:left;text-transform:uppercase;margin:32px 0 12px 0;font-size:1.18rem;font-weight:700;letter-spacing:0.03em;border-bottom:2px solid #e0e4ef;padding-bottom:4px;">${line}</h2>`;
+        // Section heading: bold, larger, exactly two lines (about 2em) margin above and below
+        html += `<h2 style="
+          display:block;
+          font-size:1.35rem;
+          font-weight:800;
+          margin:2em 0 2em 0;
+          line-height:1.2;
+          border-bottom:2px solid #e0e4ef;
+          padding-bottom:4px;
+          text-align:left;
+          text-transform:uppercase;
+          letter-spacing:0.03em;
+        ">${line}</h2>`;
         lastWasSection = true;
         continue;
       }
@@ -1018,6 +1027,7 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
               dangerouslySetInnerHTML={{ __html: formatCVContent(cvData.content) }}
             />
             {/* PDF Viewer: Show actual PDF visually if the file is a PDF */}
+            {/*
             {cvData && cvData.filename && cvData.filename.toLowerCase().endsWith('.pdf') && (
               <div style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
                 <div style={{ padding: '10px', background: '#f8f9fa', borderBottom: '1px solid #ddd', fontWeight: 'bold' }}>
@@ -1030,6 +1040,7 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
                 />
               </div>
             )}
+            */}
           </>
         ) : cvData && !cvData.content ? (
           <PlaceholderMessage>
