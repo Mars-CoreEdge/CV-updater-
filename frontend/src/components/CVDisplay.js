@@ -273,7 +273,66 @@ const CVContent = styled.div`
     padding: 1em;
     background: rgba(102, 126, 234, 0.05);
     border-radius: 8px;
+    font-size: 0.9rem;
+    color: #4a5568;
+  }
+  
+  /* CV Name styling */
+  .cv-name {
+    text-align: center;
+    margin: 1.5em 0 1em 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #1a202c;
+    letter-spacing: 0.1rem;
+  }
+  
+  /* CV Section Headers - MUCH LARGER */
+  .cv-section-header {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary-color);
+    margin: 2.5em 0 1.2em 0;
+    padding-bottom: 12px;
+    border-bottom: 3px solid #667eea;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(102, 126, 234, 0.02));
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
+  }
+  
+  /* CV Job Titles */
+  .cv-job-title {
+    font-weight: 600;
     font-size: 1.1rem;
+    margin-bottom: 0.5em;
+    color: #2d3748;
+  }
+  
+  /* CV Lists */
+  .cv-list {
+    margin-left: 2em;
+    margin-bottom: 1.2em;
+    padding-left: 1.2em;
+  }
+  
+  .cv-list-item {
+    margin-bottom: 0.5em;
+    line-height: 1.6;
+    font-size: 0.9rem;
+  }
+  
+  /* CV Paragraphs - SMALLER */
+  .cv-paragraph {
+    margin-bottom: 0.8em;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    font-weight: 400;
+    text-align: justify;
+    color: #4a5568;
   }
   
   /* Section dividers */
@@ -581,9 +640,109 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
     let nameRendered = false;
     let contactBlock = [];
     let lastWasSection = false;
-    const sectionHeaderRegex = /^(PROFILE SUMMARY|SUMMARY|SKILLS|WORK EXPERIENCE|EXPERIENCE|EDUCATION|PROJECTS|PROFESSIONAL SKILLS|TECHNICAL SKILLS|CONTACT|OBJECTIVE|QUALIFICATIONS)$/i;
+    
+    // Improved section detection - look for common CV section keywords
+    const sectionKeywords = [
+      // Personal & Contact Information
+      'CONTACT INFORMATION', 'CONTACT DETAILS', 'PERSONAL INFORMATION', 'PROFILE', 'BIO', 'SUMMARY', 
+      'PERSONAL SUMMARY', 'ABOUT ME', 'PERSONAL PROFILE', 'CANDIDATE PROFILE', 'CAREER OVERVIEW', 
+      'EXECUTIVE SUMMARY', 'CAREER PROFILE', 'SNAPSHOT', 'RESUME SUMMARY', 'STATEMENT OF PURPOSE',
+      
+      // Objective / Goal
+      'OBJECTIVE', 'CAREER OBJECTIVE', 'PROFESSIONAL OBJECTIVE', 'EMPLOYMENT OBJECTIVE', 
+      'CAREER GOAL', 'PERSONAL OBJECTIVE',
+      
+      // Professional Experience
+      'WORK EXPERIENCE', 'PROFESSIONAL EXPERIENCE', 'EXPERIENCE', 'EMPLOYMENT HISTORY', 
+      'JOB HISTORY', 'CAREER HISTORY', 'CAREER EXPERIENCE', 'WORK HISTORY', 'RELEVANT EXPERIENCE', 
+      'FREELANCE EXPERIENCE', 'INDUSTRY EXPERIENCE', 'INTERNSHIPS', 'INTERNSHIP EXPERIENCE', 
+      'PRACTICAL EXPERIENCE', 'PROJECT EXPERIENCE', 'CONSULTING EXPERIENCE', 'FIELD WORK',
+      
+      // Education & Academics
+      'EDUCATION', 'ACADEMIC BACKGROUND', 'EDUCATIONAL BACKGROUND', 'ACADEMIC QUALIFICATIONS', 
+      'ACADEMIC HISTORY', 'EDUCATION & TRAINING', 'DEGREES', 'QUALIFICATIONS', 'SCHOOLING', 
+      'ACADEMIC PROFILE', 'CERTIFICATIONS AND EDUCATION', 'EDUCATIONAL EXPERIENCE',
+      
+      // Skills
+      'SKILLS', 'TECHNICAL SKILLS', 'HARD SKILLS', 'SOFT SKILLS', 'CORE SKILLS', 'KEY SKILLS', 
+      'TRANSFERABLE SKILLS', 'FUNCTIONAL SKILLS', 'COMPETENCIES', 'AREAS OF EXPERTISE', 
+      'AREAS OF KNOWLEDGE', 'SKILL HIGHLIGHTS', 'SKILLS SUMMARY', 'LANGUAGE SKILLS', 'IT SKILLS',
+      
+      // Certifications & Training
+      'CERTIFICATIONS', 'LICENSES', 'COURSES', 'ONLINE COURSES', 'CERTIFICATIONS & LICENSES', 
+      'CREDENTIALS', 'PROFESSIONAL CERTIFICATIONS', 'TECHNICAL CERTIFICATIONS', 'SPECIALIZED TRAINING', 
+      'TRAINING & DEVELOPMENT', 'COMPLETED COURSES',
+      
+      // Projects
+      'PROJECTS', 'KEY PROJECTS', 'PROJECT PORTFOLIO', 'MAJOR PROJECTS', 'TECHNICAL PROJECTS', 
+      'CLIENT PROJECTS', 'NOTABLE PROJECTS', 'FREELANCE PROJECTS', 'PROJECT HIGHLIGHTS', 
+      'RESEARCH PROJECTS', 'CAPSTONE PROJECT',
+      
+      // Research & Academic Work
+      'RESEARCH', 'RESEARCH EXPERIENCE', 'PUBLICATIONS', 'PAPERS', 'ACADEMIC WORK', 'RESEARCH PAPERS', 
+      'THESES', 'DISSERTATIONS', 'CONFERENCE PRESENTATIONS', 'PRESENTATIONS', 'ACADEMIC CONTRIBUTIONS', 
+      'RESEARCH HIGHLIGHTS', 'SCHOLARLY WORK',
+      
+      // Awards & Achievements
+      'AWARDS', 'HONORS', 'HONORS & AWARDS', 'ACHIEVEMENTS', 'NOTABLE ACHIEVEMENTS', 
+      'CAREER ACHIEVEMENTS', 'DISTINCTIONS', 'RECOGNITIONS', 'SCHOLARSHIPS', 'FELLOWSHIPS', 
+      'ACADEMIC AWARDS',
+      
+      // Leadership & Activities
+      'LEADERSHIP EXPERIENCE', 'LEADERSHIP ROLES', 'ACTIVITIES', 'STUDENT ACTIVITIES', 
+      'CAMPUS INVOLVEMENT', 'PROFESSIONAL ACTIVITIES', 'ORGANIZATIONAL INVOLVEMENT', 
+      'LEADERSHIP & INVOLVEMENT',
+      
+      // Volunteer / Community Involvement
+      'VOLUNTEER WORK', 'VOLUNTEERING', 'COMMUNITY SERVICE', 'CIVIC ENGAGEMENT', 'SOCIAL INVOLVEMENT', 
+      'COMMUNITY INVOLVEMENT', 'CHARITABLE WORK', 'PRO BONO WORK',
+      
+      // Languages
+      'LANGUAGES', 'LANGUAGE PROFICIENCY', 'SPOKEN LANGUAGES', 'FOREIGN LANGUAGES',
+      
+      // Tools & Technologies
+      'TOOLS', 'TECHNOLOGIES', 'SOFTWARE', 'PROGRAMMING LANGUAGES', 'FRAMEWORKS', 'PLATFORMS', 
+      'IT PROFICIENCY', 'SOFTWARE PROFICIENCY', 'SYSTEMS', 'ENVIRONMENTS',
+      
+      // Hobbies & Personal Interests
+      'HOBBIES', 'INTERESTS', 'PERSONAL INTERESTS', 'ACTIVITIES & INTERESTS', 'OUTSIDE INTERESTS', 
+      'EXTRACURRICULAR ACTIVITIES', 'LEISURE INTERESTS',
+      
+      // References & Availability
+      'REFERENCES', 'REFERENCES AVAILABLE UPON REQUEST', 'REFEREES', 'CONTACTABLE REFERENCES', 
+      'PROFESSIONAL REFERENCES', 'AVAILABILITY', 'NOTICE PERIOD', 'JOINING DATE',
+      
+      // Additional / Miscellaneous
+      'ADDITIONAL INFORMATION', 'MISCELLANEOUS', 'ADDENDUM', 'ANNEXURES', 'SUPPLEMENTARY DETAILS', 
+      'ACCOMPLISHMENTS', 'CAREER HIGHLIGHTS', 'SUMMARY OF QUALIFICATIONS', 'WORK AUTHORIZATION', 
+      'CITIZENSHIP', 'MILITARY SERVICE', 'SECURITY CLEARANCE', 'PUBLICATIONS & PRESENTATIONS', 
+      'PROFESSIONAL MEMBERSHIPS', 'AFFILIATIONS', 'MEMBERSHIPS', 'PORTFOLIOS', 'GITHUB', 'LINKEDIN', 
+      'SOCIAL LINKS', 'ONLINE PRESENCE'
+    ];
+    
+    const isSectionHeader = (line) => {
+      const cleanLine = line.replace(/[_\-\s]+/g, ' ').trim().toUpperCase();
+      
+      // Check if line contains section keywords
+      const hasKeyword = sectionKeywords.some(keyword => cleanLine.includes(keyword));
+      
+      // Check if it's a standalone section header (not mixed with other content)
+      const isStandalone = cleanLine.length < 50 && 
+                          (cleanLine === line.toUpperCase() || 
+                           cleanLine.includes('_____') ||
+                           /^[A-Z\s_\-]+$/.test(cleanLine));
+      
+      // Check if it's at the beginning of a line or after a line break
+      const isAtStart = line.trim().length > 0 && 
+                       (line.trim().toUpperCase() === cleanLine || 
+                        line.trim().startsWith(cleanLine.split(' ')[0]));
+      
+      return hasKeyword && (isStandalone || isAtStart);
+    };
+    
     const bulletRegex = /^([\u2022\u2023\u25E6\u2043\u2219\*-])\s?(.*)/;
     const contactRegex = /@|\+\d|linkedin|github|email|www\./i;
+    
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i].trim();
       if (!line) {
@@ -592,75 +751,74 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
           inList = false;
         }
         if (contactBlock.length > 0) {
-          html += `<div style="text-align:center;margin:0 0 18px 0;font-size:1.05rem;color:#555;">${contactBlock.join('<br/>')}</div>`;
+          html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
           contactBlock = [];
         }
         continue;
       }
+      
       // Render name as big heading (only first non-empty line)
       if (!nameRendered) {
-        html += `<div style="text-align:center;margin:18px 0 8px 0;"><h1 style="margin:0;font-size:1rem;font-weight:200;letter-spacing:0.1rem;">${line}</h1></div>`;
+        html += `<h1 class="cv-name">${line}</h1>`;
         nameRendered = true;
         lastWasSection = false;
         continue;
       }
+      
       // Collect contact info lines (immediately after name, up to 3 lines)
       if (nameRendered && contactBlock.length < 3 && contactRegex.test(line)) {
         contactBlock.push(line);
         continue;
       }
+      
       if (contactBlock.length > 0) {
-        html += `<div style="text-align:center;margin:0 0 24px 0;font-size:1.05rem;color:#555;">${contactBlock.join('<br/>')}</div>`;
+        html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
         contactBlock = [];
       }
-      // Section headers: match only if line is exactly a section name
-      if (sectionHeaderRegex.test(line.replace(/[_\-\s]+/g, ' ').trim().toUpperCase())) {
+      
+      // Section headers: improved detection
+      if (isSectionHeader(line)) {
         if (inList) {
           html += '</ul>';
           inList = false;
         }
-        // Section heading: bold, larger, exactly two lines (about 2em) margin above and below
-        html += `<h2 style="
-          display:block;
-          font-size:1.35rem;
-          font-weight:800;
-          margin:2em 0 2em 0;
-          line-height:1.2;
-          border-bottom:2px solid #e0e4ef;
-          padding-bottom:4px;
-          text-align:left;
-          text-transform:uppercase;
-          letter-spacing:0.03em;
-        ">${line}</h2>`;
+        // Section heading: use CSS classes instead of inline styles
+        html += `<h2 class="cv-section-header">${line}</h2>`;
         lastWasSection = true;
         continue;
       }
+      
       lastWasSection = false;
+      
       // Bullet points
       const bulletMatch = line.match(bulletRegex);
       if (bulletMatch) {
         if (!inList) {
-          html += '<ul style="margin-left:2em;margin-bottom:0.8em;padding-left:1.2em;">';
+          html += '<ul class="cv-list">';
           inList = true;
         }
-        html += `<li style="font-size:1rem;line-height:1.7;margin-bottom:0.3em;">${bulletMatch[2] || ''}</li>`;
+        html += `<li class="cv-list-item">${bulletMatch[2] || ''}</li>`;
         continue;
       } else if (inList) {
         html += '</ul>';
         inList = false;
       }
+      
       // Job titles/companies: only bold if line is short and after a section header
-      if (line.length < 60 && i > 0 && sectionHeaderRegex.test(lines[i-1].replace(/[_\-\s]+/g, ' ').trim().toUpperCase())) {
-        html += `<div style="font-weight:600;font-size:1.07rem;margin-bottom:0.2em;">${line}</div>`;
+      if (line.length < 60 && i > 0 && isSectionHeader(lines[i-1])) {
+        html += `<div class="cv-job-title">${line}</div>`;
         continue;
       }
+      
       // Regular paragraph
-      html += `<p style="margin:0 0 0.7em 0;font-size:1rem;line-height:1.7;font-weight:400;">${line}</p>`;
+      html += `<p class="cv-paragraph">${line}</p>`;
     }
+    
     if (inList) html += '</ul>';
     if (contactBlock.length > 0) {
-      html += `<div style="text-align:center;margin:0 0 24px 0;font-size:1.05rem;color:#555;">${contactBlock.join('<br/>')}</div>`;
+      html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
     }
+    
     return html;
   };
 
@@ -1027,20 +1185,18 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
               dangerouslySetInnerHTML={{ __html: formatCVContent(cvData.content) }}
             />
             {/* PDF Viewer: Show actual PDF visually if the file is a PDF */}
-            {/*
-            {cvData && cvData.filename && cvData.filename.toLowerCase().endsWith('.pdf') && (
+            {showPdfPreview && pdfUrl && (
               <div style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
                 <div style={{ padding: '10px', background: '#f8f9fa', borderBottom: '1px solid #ddd', fontWeight: 'bold' }}>
                   📄 PDF Preview
                 </div>
                 <iframe
-                  src="http://localhost:8081/cv/pdf-preview"
+                  src={pdfUrl}
                   style={{ width: '100%', height: '600px', border: 'none' }}
                   title="CV PDF Preview"
                 />
               </div>
             )}
-            */}
           </>
         ) : cvData && !cvData.content ? (
           <PlaceholderMessage>

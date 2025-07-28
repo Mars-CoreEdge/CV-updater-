@@ -29,125 +29,178 @@ except ImportError:
     print("❌ ERROR: db.py not found. Please ensure the database configuration file exists.")
     raise ImportError("Database configuration file (db.py) is required")
 
-# Enhanced Section Detection Patterns - Updated for simple CV format
+# Comprehensive Section Detection Patterns - Exhaustive CV Section Headings
 SECTION_PATTERNS = {
+    # Personal & Contact Information
     "contact": [
-        r"^CONTACT\s+INFORMATION$",
-        r"^CONTACT$",
-        r"^PERSONAL\s+INFORMATION$",
-        r"^DETAILS$",
-        r"^[_\-=\s]*CONTACT\s+INFORMATION[_\-=\s]*$",
-        r"^[_\-=\s]*CONTACT[_\-=\s]*$",
-        r"^[_\-=\s]*PERSONAL\s+INFORMATION[_\-=\s]*$",
-        r"^[_\-=\s]*DETAILS[_\-=\s]*$"
+        r"^CONTACT\s+INFORMATION$", r"^CONTACT\s+DETAILS$", r"^PERSONAL\s+INFORMATION$", r"^PROFILE$", r"^BIO$", r"^SUMMARY$",
+        r"^PERSONAL\s+SUMMARY$", r"^ABOUT\s+ME$", r"^PERSONAL\s+PROFILE$", r"^CANDIDATE\s+PROFILE$", r"^CAREER\s+OVERVIEW$",
+        r"^EXECUTIVE\s+SUMMARY$", r"^CAREER\s+PROFILE$", r"^SNAPSHOT$", r"^RESUME\s+SUMMARY$", r"^STATEMENT\s+OF\s+PURPOSE$",
+        r"^[_\-=\s]*CONTACT\s+INFORMATION[_\-=\s]*$", r"^[_\-=\s]*CONTACT\s+DETAILS[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+INFORMATION[_\-=\s]*$",
+        r"^[_\-=\s]*PROFILE[_\-=\s]*$", r"^[_\-=\s]*BIO[_\-=\s]*$", r"^[_\-=\s]*SUMMARY[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+SUMMARY[_\-=\s]*$",
+        r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$", r"^[_\-=\s]*CANDIDATE\s+PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+OVERVIEW[_\-=\s]*$", r"^[_\-=\s]*EXECUTIVE\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*CAREER\s+PROFILE[_\-=\s]*$",
+        r"^[_\-=\s]*SNAPSHOT[_\-=\s]*$", r"^[_\-=\s]*RESUME\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*STATEMENT\s+OF\s+PURPOSE[_\-=\s]*$"
     ],
-    "profile": [
-        r"^ABOUT\s+MYSELF$",
-        r"^ABOUT\s+ME$",
-        r"^PROFILE$",
-        r"^PROFILE\s+SUMMARY$",
-        r"^SUMMARY$",
-        r"^PERSONAL\s+PROFILE$",
-        r"^OBJECTIVE$",
-        r"^CAREER\s+OBJECTIVE$",
-        r"^[_\-=\s]*ABOUT\s+MYSELF[_\-=\s]*$",
-        r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$",
-        r"^[_\-=\s]*PROFILE[_\-=\s]*$",
-        r"^[_\-=\s]*PROFILE\s+SUMMARY[_\-=\s]*$",
-        r"^[_\-=\s]*SUMMARY[_\-=\s]*$",
-        r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$",
-        r"^[_\-=\s]*OBJECTIVE[_\-=\s]*$",
-        r"^[_\-=\s]*CAREER\s+OBJECTIVE[_\-=\s]*$"
+    
+    # Objective / Goal
+    "objective": [
+        r"^OBJECTIVE$", r"^CAREER\s+OBJECTIVE$", r"^PROFESSIONAL\s+OBJECTIVE$", r"^EMPLOYMENT\s+OBJECTIVE$",
+        r"^CAREER\s+GOAL$", r"^PERSONAL\s+OBJECTIVE$",
+        r"^[_\-=\s]*OBJECTIVE[_\-=\s]*$", r"^[_\-=\s]*CAREER\s+OBJECTIVE[_\-=\s]*$", r"^[_\-=\s]*PROFESSIONAL\s+OBJECTIVE[_\-=\s]*$",
+        r"^[_\-=\s]*EMPLOYMENT\s+OBJECTIVE[_\-=\s]*$", r"^[_\-=\s]*CAREER\s+GOAL[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+OBJECTIVE[_\-=\s]*$"
     ],
-    "skills": [
-        r"^SKILLS$",
-        r"^TECHNICAL\s+SKILLS$",
-        r"^PROFESSIONAL\s+SKILLS$",
-        r"^CORE\s+SKILLS$",
-        r"^COMPETENCIES$",
-        r"^EXPERTISE$",
-        r"^[_\-=\s]*SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*PROFESSIONAL\s+SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$",
-        r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
-        r"^[_\-=\s]*EXPERTISE[_\-=\s]*$"
-    ],
+    
+    # Professional Experience
     "experience": [
-        r"^WORK\s+EXPERIENCE$",
-        r"^EXPERIENCE$",
-        r"^PROFESSIONAL\s+EXPERIENCE$",
-        r"^EMPLOYMENT\s+HISTORY$",
-        r"^CAREER\s+HISTORY$",
-        r"^WORK\s+HISTORY$",
-        r"^[_\-=\s]*WORK\s+EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*PROFESSIONAL\s+EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*EMPLOYMENT\s+HISTORY[_\-=\s]*$",
-        r"^[_\-=\s]*CAREER\s+HISTORY[_\-=\s]*$",
-        r"^[_\-=\s]*WORK\s+HISTORY[_\-=\s]*$"
+        r"^WORK\s+EXPERIENCE$", r"^PROFESSIONAL\s+EXPERIENCE$", r"^EXPERIENCE$", r"^EMPLOYMENT\s+HISTORY$",
+        r"^JOB\s+HISTORY$", r"^CAREER\s+HISTORY$", r"^CAREER\s+EXPERIENCE$", r"^WORK\s+HISTORY$", r"^RELEVANT\s+EXPERIENCE$",
+        r"^FREELANCE\s+EXPERIENCE$", r"^INDUSTRY\s+EXPERIENCE$", r"^INTERNSHIPS$", r"^INTERNSHIP\s+EXPERIENCE$",
+        r"^PRACTICAL\s+EXPERIENCE$", r"^PROJECT\s+EXPERIENCE$", r"^CONSULTING\s+EXPERIENCE$", r"^FIELD\s+WORK$",
+        r"^[_\-=\s]*WORK\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*PROFESSIONAL\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*EMPLOYMENT\s+HISTORY[_\-=\s]*$", r"^[_\-=\s]*JOB\s+HISTORY[_\-=\s]*$", r"^[_\-=\s]*CAREER\s+HISTORY[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*WORK\s+HISTORY[_\-=\s]*$", r"^[_\-=\s]*RELEVANT\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*FREELANCE\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*INDUSTRY\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*INTERNSHIPS[_\-=\s]*$",
+        r"^[_\-=\s]*INTERNSHIP\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*PRACTICAL\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*PROJECT\s+EXPERIENCE[_\-=\s]*$",
+        r"^[_\-=\s]*CONSULTING\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*FIELD\s+WORK[_\-=\s]*$"
     ],
+    
+    # Education & Academics
     "education": [
-        r"^EDUCATION\s+AND\s+TRAINING$",
-        r"^EDUCATION$",
-        r"^EDUCATIONAL\s+BACKGROUND$",
-        r"^EDUCATION\s+&\s+QUALIFICATIONS$",
-        r"^ACADEMIC\s+BACKGROUND$",
-        r"^QUALIFICATIONS$",
-        r"^ACADEMIC\s+QUALIFICATIONS$",
-        r"^EDUCATION\s+&\s+TRAINING$",
-        r"^[_\-=\s]*EDUCATION\s+AND\s+TRAINING[_\-=\s]*$",
-        r"^[_\-=\s]*EDUCATION[_\-=\s]*$",
-        r"^[_\-=\s]*EDUCATIONAL\s+BACKGROUND[_\-=\s]*$",
-        r"^[_\-=\s]*EDUCATION\s+&\s+QUALIFICATIONS[_\-=\s]*$",
-        r"^[_\-=\s]*ACADEMIC\s+BACKGROUND[_\-=\s]*$",
-        r"^[_\-=\s]*QUALIFICATIONS[_\-=\s]*$",
-        r"^[_\-=\s]*ACADEMIC\s+QUALIFICATIONS[_\-=\s]*$",
-        r"^[_\-=\s]*EDUCATION\s+&\s+TRAINING[_\-=\s]*$"
+        r"^EDUCATION$", r"^ACADEMIC\s+BACKGROUND$", r"^EDUCATIONAL\s+BACKGROUND$", r"^ACADEMIC\s+QUALIFICATIONS$",
+        r"^ACADEMIC\s+HISTORY$", r"^EDUCATION\s+&\s+TRAINING$", r"^DEGREES$", r"^QUALIFICATIONS$", r"^SCHOOLING$",
+        r"^ACADEMIC\s+PROFILE$", r"^CERTIFICATIONS\s+AND\s+EDUCATION$", r"^EDUCATIONAL\s+EXPERIENCE$",
+        r"^[_\-=\s]*EDUCATION[_\-=\s]*$", r"^[_\-=\s]*ACADEMIC\s+BACKGROUND[_\-=\s]*$", r"^[_\-=\s]*EDUCATIONAL\s+BACKGROUND[_\-=\s]*$",
+        r"^[_\-=\s]*ACADEMIC\s+QUALIFICATIONS[_\-=\s]*$", r"^[_\-=\s]*ACADEMIC\s+HISTORY[_\-=\s]*$", r"^[_\-=\s]*EDUCATION\s+&\s+TRAINING[_\-=\s]*$",
+        r"^[_\-=\s]*DEGREES[_\-=\s]*$", r"^[_\-=\s]*QUALIFICATIONS[_\-=\s]*$", r"^[_\-=\s]*SCHOOLING[_\-=\s]*$",
+        r"^[_\-=\s]*ACADEMIC\s+PROFILE[_\-=\s]*$", r"^[_\-=\s]*CERTIFICATIONS\s+AND\s+EDUCATION[_\-=\s]*$", r"^[_\-=\s]*EDUCATIONAL\s+EXPERIENCE[_\-=\s]*$"
     ],
+    
+    # Skills
+    "skills": [
+        r"^SKILLS$", r"^TECHNICAL\s+SKILLS$", r"^HARD\s+SKILLS$", r"^SOFT\s+SKILLS$", r"^CORE\s+SKILLS$", r"^KEY\s+SKILLS$",
+        r"^TRANSFERABLE\s+SKILLS$", r"^FUNCTIONAL\s+SKILLS$", r"^COMPETENCIES$", r"^AREAS\s+OF\s+EXPERTISE$",
+        r"^AREAS\s+OF\s+KNOWLEDGE$", r"^SKILL\s+HIGHLIGHTS$", r"^SKILLS\s+SUMMARY$", r"^LANGUAGE\s+SKILLS$", r"^IT\s+SKILLS$",
+        r"^[_\-=\s]*SKILLS[_\-=\s]*$", r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*HARD\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*SOFT\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*KEY\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*TRANSFERABLE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*FUNCTIONAL\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
+        r"^[_\-=\s]*AREAS\s+OF\s+EXPERTISE[_\-=\s]*$", r"^[_\-=\s]*AREAS\s+OF\s+KNOWLEDGE[_\-=\s]*$", r"^[_\-=\s]*SKILL\s+HIGHLIGHTS[_\-=\s]*$",
+        r"^[_\-=\s]*SKILLS\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*LANGUAGE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*IT\s+SKILLS[_\-=\s]*$"
+    ],
+    
+    # Certifications & Training
     "certifications": [
-        r"^CERTIFICATIONS$",
-        r"^CERTIFICATES$",
-        r"^CERTIFICATE$",
-        r"^[_\-=\s]*CERTIFICATIONS[_\-=\s]*$",
-        r"^[_\-=\s]*CERTIFICATES[_\-=\s]*$",
-        r"^[_\-=\s]*CERTIFICATE[_\-=\s]*$"
+        r"^CERTIFICATIONS$", r"^LICENSES$", r"^COURSES$", r"^ONLINE\s+COURSES$", r"^CERTIFICATIONS\s+&\s+LICENSES$",
+        r"^CREDENTIALS$", r"^PROFESSIONAL\s+CERTIFICATIONS$", r"^TECHNICAL\s+CERTIFICATIONS$", r"^SPECIALIZED\s+TRAINING$",
+        r"^TRAINING\s+&\s+DEVELOPMENT$", r"^COMPLETED\s+COURSES$",
+        r"^[_\-=\s]*CERTIFICATIONS[_\-=\s]*$", r"^[_\-=\s]*LICENSES[_\-=\s]*$", r"^[_\-=\s]*COURSES[_\-=\s]*$",
+        r"^[_\-=\s]*ONLINE\s+COURSES[_\-=\s]*$", r"^[_\-=\s]*CERTIFICATIONS\s+&\s+LICENSES[_\-=\s]*$", r"^[_\-=\s]*CREDENTIALS[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+CERTIFICATIONS[_\-=\s]*$", r"^[_\-=\s]*TECHNICAL\s+CERTIFICATIONS[_\-=\s]*$", r"^[_\-=\s]*SPECIALIZED\s+TRAINING[_\-=\s]*$",
+        r"^[_\-=\s]*TRAINING\s+&\s+DEVELOPMENT[_\-=\s]*$", r"^[_\-=\s]*COMPLETED\s+COURSES[_\-=\s]*$"
     ],
+    
+    # Projects
     "projects": [
-        r"^PROJECTS$",
-        r"^PROJECT\s+EXPERIENCE$",
-        r"^KEY\s+PROJECTS$",
-        r"^SELECTED\s+PROJECTS$",
-        r"^PORTFOLIO$",
-        r"^[_\-=\s]*PROJECTS[_\-=\s]*$",
-        r"^[_\-=\s]*PROJECT\s+EXPERIENCE[_\-=\s]*$",
-        r"^[_\-=\s]*KEY\s+PROJECTS[_\-=\s]*$",
-        r"^[_\-=\s]*SELECTED\s+PROJECTS[_\-=\s]*$",
-        r"^[_\-=\s]*PORTFOLIO[_\-=\s]*$"
+        r"^PROJECTS$", r"^KEY\s+PROJECTS$", r"^PROJECT\s+PORTFOLIO$", r"^MAJOR\s+PROJECTS$", r"^TECHNICAL\s+PROJECTS$",
+        r"^CLIENT\s+PROJECTS$", r"^NOTABLE\s+PROJECTS$", r"^FREELANCE\s+PROJECTS$", r"^PROJECT\s+HIGHLIGHTS$",
+        r"^RESEARCH\s+PROJECTS$", r"^CAPSTONE\s+PROJECT$",
+        r"^[_\-=\s]*PROJECTS[_\-=\s]*$", r"^[_\-=\s]*KEY\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*PROJECT\s+PORTFOLIO[_\-=\s]*$",
+        r"^[_\-=\s]*MAJOR\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*TECHNICAL\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*CLIENT\s+PROJECTS[_\-=\s]*$",
+        r"^[_\-=\s]*NOTABLE\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*FREELANCE\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*PROJECT\s+HIGHLIGHTS[_\-=\s]*$",
+        r"^[_\-=\s]*RESEARCH\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*CAPSTONE\s+PROJECT[_\-=\s]*$"
     ],
+    
+    # Research & Academic Work
+    "research": [
+        r"^RESEARCH$", r"^RESEARCH\s+EXPERIENCE$", r"^PUBLICATIONS$", r"^PAPERS$", r"^ACADEMIC\s+WORK$", r"^RESEARCH\s+PAPERS$",
+        r"^THESES$", r"^DISSERTATIONS$", r"^CONFERENCE\s+PRESENTATIONS$", r"^PRESENTATIONS$", r"^ACADEMIC\s+CONTRIBUTIONS$",
+        r"^RESEARCH\s+HIGHLIGHTS$", r"^SCHOLARLY\s+WORK$",
+        r"^[_\-=\s]*RESEARCH[_\-=\s]*$", r"^[_\-=\s]*RESEARCH\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*PUBLICATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*PAPERS[_\-=\s]*$", r"^[_\-=\s]*ACADEMIC\s+WORK[_\-=\s]*$", r"^[_\-=\s]*RESEARCH\s+PAPERS[_\-=\s]*$",
+        r"^[_\-=\s]*THESES[_\-=\s]*$", r"^[_\-=\s]*DISSERTATIONS[_\-=\s]*$", r"^[_\-=\s]*CONFERENCE\s+PRESENTATIONS[_\-=\s]*$",
+        r"^[_\-=\s]*PRESENTATIONS[_\-=\s]*$", r"^[_\-=\s]*ACADEMIC\s+CONTRIBUTIONS[_\-=\s]*$", r"^[_\-=\s]*RESEARCH\s+HIGHLIGHTS[_\-=\s]*$",
+        r"^[_\-=\s]*SCHOLARLY\s+WORK[_\-=\s]*$"
+    ],
+    
+    # Awards & Achievements
     "achievements": [
-        r"^ACHIEVEMENTS$",
-        r"^AWARDS$",
-        r"^HONORS$",
-        r"^RECOGNITIONS$",
-        r"^[_\-=\s]*ACHIEVEMENTS[_\-=\s]*$",
-        r"^[_\-=\s]*AWARDS[_\-=\s]*$",
-        r"^[_\-=\s]*HONORS[_\-=\s]*$",
-        r"^[_\-=\s]*RECOGNITIONS[_\-=\s]*$"
+        r"^AWARDS$", r"^HONORS$", r"^HONORS\s+&\s+AWARDS$", r"^ACHIEVEMENTS$", r"^NOTABLE\s+ACHIEVEMENTS$",
+        r"^CAREER\s+ACHIEVEMENTS$", r"^DISTINCTIONS$", r"^RECOGNITIONS$", r"^SCHOLARSHIPS$", r"^FELLOWSHIPS$",
+        r"^ACADEMIC\s+AWARDS$",
+        r"^[_\-=\s]*AWARDS[_\-=\s]*$", r"^[_\-=\s]*HONORS[_\-=\s]*$", r"^[_\-=\s]*HONORS\s+&\s+AWARDS[_\-=\s]*$",
+        r"^[_\-=\s]*ACHIEVEMENTS[_\-=\s]*$", r"^[_\-=\s]*NOTABLE\s+ACHIEVEMENTS[_\-=\s]*$", r"^[_\-=\s]*CAREER\s+ACHIEVEMENTS[_\-=\s]*$",
+        r"^[_\-=\s]*DISTINCTIONS[_\-=\s]*$", r"^[_\-=\s]*RECOGNITIONS[_\-=\s]*$", r"^[_\-=\s]*SCHOLARSHIPS[_\-=\s]*$",
+        r"^[_\-=\s]*FELLOWSHIPS[_\-=\s]*$", r"^[_\-=\s]*ACADEMIC\s+AWARDS[_\-=\s]*$"
     ],
+    
+    # Leadership & Activities
+    "leadership": [
+        r"^LEADERSHIP\s+EXPERIENCE$", r"^LEADERSHIP\s+ROLES$", r"^ACTIVITIES$", r"^STUDENT\s+ACTIVITIES$",
+        r"^CAMPUS\s+INVOLVEMENT$", r"^PROFESSIONAL\s+ACTIVITIES$", r"^ORGANIZATIONAL\s+INVOLVEMENT$",
+        r"^LEADERSHIP\s+&\s+INVOLVEMENT$",
+        r"^[_\-=\s]*LEADERSHIP\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*LEADERSHIP\s+ROLES[_\-=\s]*$", r"^[_\-=\s]*ACTIVITIES[_\-=\s]*$",
+        r"^[_\-=\s]*STUDENT\s+ACTIVITIES[_\-=\s]*$", r"^[_\-=\s]*CAMPUS\s+INVOLVEMENT[_\-=\s]*$", r"^[_\-=\s]*PROFESSIONAL\s+ACTIVITIES[_\-=\s]*$",
+        r"^[_\-=\s]*ORGANIZATIONAL\s+INVOLVEMENT[_\-=\s]*$", r"^[_\-=\s]*LEADERSHIP\s+&\s+INVOLVEMENT[_\-=\s]*$"
+    ],
+    
+    # Volunteer / Community Involvement
+    "volunteer": [
+        r"^VOLUNTEER\s+WORK$", r"^VOLUNTEERING$", r"^COMMUNITY\s+SERVICE$", r"^CIVIC\s+ENGAGEMENT$",
+        r"^SOCIAL\s+INVOLVEMENT$", r"^COMMUNITY\s+INVOLVEMENT$", r"^CHARITABLE\s+WORK$", r"^PRO\s+BONO\s+WORK$",
+        r"^[_\-=\s]*VOLUNTEER\s+WORK[_\-=\s]*$", r"^[_\-=\s]*VOLUNTEERING[_\-=\s]*$", r"^[_\-=\s]*COMMUNITY\s+SERVICE[_\-=\s]*$",
+        r"^[_\-=\s]*CIVIC\s+ENGAGEMENT[_\-=\s]*$", r"^[_\-=\s]*SOCIAL\s+INVOLVEMENT[_\-=\s]*$", r"^[_\-=\s]*COMMUNITY\s+INVOLVEMENT[_\-=\s]*$",
+        r"^[_\-=\s]*CHARITABLE\s+WORK[_\-=\s]*$", r"^[_\-=\s]*PRO\s+BONO\s+WORK[_\-=\s]*$"
+    ],
+    
+    # Languages
     "languages": [
-        r"^LANGUAGES$",
-        r"^LANGUAGE\s+SKILLS$",
-        r"^[_\-=\s]*LANGUAGES[_\-=\s]*$",
-        r"^[_\-=\s]*LANGUAGE\s+SKILLS[_\-=\s]*$"
+        r"^LANGUAGES$", r"^LANGUAGE\s+PROFICIENCY$", r"^SPOKEN\s+LANGUAGES$", r"^FOREIGN\s+LANGUAGES$",
+        r"^[_\-=\s]*LANGUAGES[_\-=\s]*$", r"^[_\-=\s]*LANGUAGE\s+PROFICIENCY[_\-=\s]*$", r"^[_\-=\s]*SPOKEN\s+LANGUAGES[_\-=\s]*$",
+        r"^[_\-=\s]*FOREIGN\s+LANGUAGES[_\-=\s]*$"
     ],
+    
+    # Tools & Technologies
+    "technologies": [
+        r"^TOOLS$", r"^TECHNOLOGIES$", r"^SOFTWARE$", r"^PROGRAMMING\s+LANGUAGES$", r"^FRAMEWORKS$", r"^PLATFORMS$",
+        r"^IT\s+PROFICIENCY$", r"^SOFTWARE\s+PROFICIENCY$", r"^SYSTEMS$", r"^ENVIRONMENTS$",
+        r"^[_\-=\s]*TOOLS[_\-=\s]*$", r"^[_\-=\s]*TECHNOLOGIES[_\-=\s]*$", r"^[_\-=\s]*SOFTWARE[_\-=\s]*$",
+        r"^[_\-=\s]*PROGRAMMING\s+LANGUAGES[_\-=\s]*$", r"^[_\-=\s]*FRAMEWORKS[_\-=\s]*$", r"^[_\-=\s]*PLATFORMS[_\-=\s]*$",
+        r"^[_\-=\s]*IT\s+PROFICIENCY[_\-=\s]*$", r"^[_\-=\s]*SOFTWARE\s+PROFICIENCY[_\-=\s]*$", r"^[_\-=\s]*SYSTEMS[_\-=\s]*$",
+        r"^[_\-=\s]*ENVIRONMENTS[_\-=\s]*$"
+    ],
+    
+    # Hobbies & Personal Interests
     "interests": [
-        r"^INTERESTS$",
-        r"^HOBBIES$",
-        r"^PERSONAL\s+INTERESTS$",
-        r"^[_\-=\s]*INTERESTS[_\-=\s]*$",
-        r"^[_\-=\s]*HOBBIES[_\-=\s]*$",
-        r"^[_\-=\s]*PERSONAL\s+INTERESTS[_\-=\s]*$"
+        r"^HOBBIES$", r"^INTERESTS$", r"^PERSONAL\s+INTERESTS$", r"^ACTIVITIES\s+&\s+INTERESTS$", r"^OUTSIDE\s+INTERESTS$",
+        r"^EXTRACURRICULAR\s+ACTIVITIES$", r"^LEISURE\s+INTERESTS$",
+        r"^[_\-=\s]*HOBBIES[_\-=\s]*$", r"^[_\-=\s]*INTERESTS[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+INTERESTS[_\-=\s]*$",
+        r"^[_\-=\s]*ACTIVITIES\s+&\s+INTERESTS[_\-=\s]*$", r"^[_\-=\s]*OUTSIDE\s+INTERESTS[_\-=\s]*$",
+        r"^[_\-=\s]*EXTRACURRICULAR\s+ACTIVITIES[_\-=\s]*$", r"^[_\-=\s]*LEISURE\s+INTERESTS[_\-=\s]*$"
+    ],
+    
+    # References & Availability
+    "references": [
+        r"^REFERENCES$", r"^REFERENCES\s+AVAILABLE\s+UPON\s+REQUEST$", r"^REFEREES$", r"^CONTACTABLE\s+REFERENCES$",
+        r"^PROFESSIONAL\s+REFERENCES$", r"^AVAILABILITY$", r"^NOTICE\s+PERIOD$", r"^JOINING\s+DATE$",
+        r"^[_\-=\s]*REFERENCES[_\-=\s]*$", r"^[_\-=\s]*REFERENCES\s+AVAILABLE\s+UPON\s+REQUEST[_\-=\s]*$",
+        r"^[_\-=\s]*REFEREES[_\-=\s]*$", r"^[_\-=\s]*CONTACTABLE\s+REFERENCES[_\-=\s]*$", r"^[_\-=\s]*PROFESSIONAL\s+REFERENCES[_\-=\s]*$",
+        r"^[_\-=\s]*AVAILABILITY[_\-=\s]*$", r"^[_\-=\s]*NOTICE\s+PERIOD[_\-=\s]*$", r"^[_\-=\s]*JOINING\s+DATE[_\-=\s]*$"
+    ],
+    
+    # Additional / Miscellaneous
+    "additional": [
+        r"^ADDITIONAL\s+INFORMATION$", r"^MISCELLANEOUS$", r"^ADDENDUM$", r"^ANNEXURES$", r"^SUPPLEMENTARY\s+DETAILS$",
+        r"^ACCOMPLISHMENTS$", r"^CAREER\s+HIGHLIGHTS$", r"^SUMMARY\s+OF\s+QUALIFICATIONS$", r"^WORK\s+AUTHORIZATION$",
+        r"^CITIZENSHIP$", r"^MILITARY\s+SERVICE$", r"^SECURITY\s+CLEARANCE$", r"^PUBLICATIONS\s+&\s+PRESENTATIONS$",
+        r"^PROFESSIONAL\s+MEMBERSHIPS$", r"^AFFILIATIONS$", r"^MEMBERSHIPS$", r"^PORTFOLIOS$", r"^GITHUB$", r"^LINKEDIN$",
+        r"^SOCIAL\s+LINKS$", r"^ONLINE\s+PRESENCE$",
+        r"^[_\-=\s]*ADDITIONAL\s+INFORMATION[_\-=\s]*$", r"^[_\-=\s]*MISCELLANEOUS[_\-=\s]*$", r"^[_\-=\s]*ADDENDUM[_\-=\s]*$",
+        r"^[_\-=\s]*ANNEXURES[_\-=\s]*$", r"^[_\-=\s]*SUPPLEMENTARY\s+DETAILS[_\-=\s]*$", r"^[_\-=\s]*ACCOMPLISHMENTS[_\-=\s]*$",
+        r"^[_\-=\s]*CAREER\s+HIGHLIGHTS[_\-=\s]*$", r"^[_\-=\s]*SUMMARY\s+OF\s+QUALIFICATIONS[_\-=\s]*$", r"^[_\-=\s]*WORK\s+AUTHORIZATION[_\-=\s]*$",
+        r"^[_\-=\s]*CITIZENSHIP[_\-=\s]*$", r"^[_\-=\s]*MILITARY\s+SERVICE[_\-=\s]*$", r"^[_\-=\s]*SECURITY\s+CLEARANCE[_\-=\s]*$",
+        r"^[_\-=\s]*PUBLICATIONS\s+&\s+PRESENTATIONS[_\-=\s]*$", r"^[_\-=\s]*PROFESSIONAL\s+MEMBERSHIPS[_\-=\s]*$",
+        r"^[_\-=\s]*AFFILIATIONS[_\-=\s]*$", r"^[_\-=\s]*MEMBERSHIPS[_\-=\s]*$", r"^[_\-=\s]*PORTFOLIOS[_\-=\s]*$",
+        r"^[_\-=\s]*GITHUB[_\-=\s]*$", r"^[_\-=\s]*LINKEDIN[_\-=\s]*$", r"^[_\-=\s]*SOCIAL\s+LINKS[_\-=\s]*$", r"^[_\-=\s]*ONLINE\s+PRESENCE[_\-=\s]*$"
     ]
 }
 
@@ -869,9 +922,13 @@ def clean_cv_text(text: str) -> str:
     # Normalize Unicode characters
     cleaned_text = unicodedata.normalize('NFKC', cleaned_text)
     
-    # Clean up extra whitespace
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+    # Clean up extra whitespace but preserve line breaks
+    # Replace multiple spaces with single space, but keep newlines
+    cleaned_text = re.sub(r'[ \t]+', ' ', cleaned_text)
+    # Clean up multiple newlines
     cleaned_text = re.sub(r'\n\s*\n', '\n\n', cleaned_text)
+    # Remove trailing spaces from lines
+    cleaned_text = re.sub(r' +$', '', cleaned_text, flags=re.MULTILINE)
     
     return cleaned_text.strip()
 
@@ -1072,6 +1129,76 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         print("[DEBUG] classify_message_fallback: Detected EDUCATION_UPDATE")
         return {"category": "EDUCATION_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     
+    # UPDATE OPERATIONS - Check UPDATE before ADD to avoid conflicts
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_UPDATE")
+        return {"category": "OBJECTIVE_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("certification" in msg or "license" in msg or "certificate" in msg or "credential" in msg or "training" in msg):
+        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_UPDATE")
+        return {"category": "CERTIFICATION_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("research" in msg or "publication" in msg or "paper" in msg or "thesis" in msg or "dissertation" in msg):
+        print("[DEBUG] classify_message_fallback: Detected RESEARCH_UPDATE")
+        return {"category": "RESEARCH_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("award" in msg or "honor" in msg or "achievement" in msg or "recognition" in msg or "scholarship" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_UPDATE")
+        return {"category": "ACHIEVEMENT_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("leadership" in msg or "led" in msg or "managed" in msg or "supervised" in msg or "directed" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_UPDATE")
+        return {"category": "LEADERSHIP_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("volunteer" in msg or "community service" in msg or "charity" in msg or "pro bono" in msg):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_UPDATE")
+        return {"category": "VOLUNTEER_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("language" in msg or "speak" in msg or "fluent in" in msg or "proficient in" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_UPDATE")
+        return {"category": "LANGUAGE_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("tool" in msg or "technology" in msg or "technologies" in msg or "software" in msg or "framework" in msg or "platform" in msg):
+        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_UPDATE")
+        return {"category": "TECHNOLOGY_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("hobby" in msg or "interest" in msg or "passion" in msg or "enjoy" in msg or "like to" in msg):
+        print("[DEBUG] classify_message_fallback: Detected INTEREST_UPDATE")
+        return {"category": "INTEREST_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("reference" in msg or "referee" in msg or "recommendation" in msg or "endorsement" in msg):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_UPDATE")
+        return {"category": "REFERENCE_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    if any(kw in msg for kw in ["update", "change", "modify"]) and ("additional" in msg or "miscellaneous" in msg or "other" in msg or "extra" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_UPDATE")
+        return {"category": "ADDITIONAL_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
+    
+    # ADD OPERATIONS - More specific patterns to avoid catching UPDATE messages
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD")
+        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("certification" in msg or "license" in msg or "certificate" in msg or "credential" in msg or "training" in msg):
+        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_ADD")
+        return {"category": "CERTIFICATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("research" in msg or "publication" in msg or "paper" in msg or "thesis" in msg or "dissertation" in msg):
+        print("[DEBUG] classify_message_fallback: Detected RESEARCH_ADD")
+        return {"category": "RESEARCH_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("award" in msg or "honor" in msg or "achievement" in msg or "recognition" in msg or "scholarship" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_ADD")
+        return {"category": "ACHIEVEMENT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("leadership" in msg or "led" in msg or "managed" in msg or "supervised" in msg or "directed" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_ADD")
+        return {"category": "LEADERSHIP_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("volunteer" in msg or "community service" in msg or "charity" in msg or "pro bono" in msg):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_ADD")
+        return {"category": "VOLUNTEER_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("language" in msg or "speak" in msg or "fluent in" in msg or "proficient in" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_ADD")
+        return {"category": "LANGUAGE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("tool" in msg or "technology" in msg or "technologies" in msg or "software" in msg or "framework" in msg or "platform" in msg):
+        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_ADD")
+        return {"category": "TECHNOLOGY_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("hobby" in msg or "interest" in msg or "passion" in msg or "enjoy" in msg or "like to" in msg):
+        print("[DEBUG] classify_message_fallback: Detected INTEREST_ADD")
+        return {"category": "INTEREST_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("reference" in msg or "referee" in msg or "recommendation" in msg or "endorsement" in msg):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_ADD")
+        return {"category": "REFERENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("additional" in msg or "miscellaneous" in msg or "other" in msg or "extra" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_ADD")
+        return {"category": "ADDITIONAL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    
     # READ OPERATIONS
     if any(phrase in msg for phrase in ["show cv", "display cv", "my cv", "current cv"]):
         print("[DEBUG] classify_message_fallback: Detected CV_SHOW")
@@ -1092,24 +1219,42 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         print("[DEBUG] classify_message_fallback: Detected CONTACT_SHOW")
         return {"category": "CONTACT_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     
-    # DELETE OPERATIONS
-    elif any(phrase in msg for phrase in ["remove skill", "delete skill", "don't have skill"]):
-        print("[DEBUG] classify_message_fallback: Detected SKILL_DELETE")
-        return {"category": "SKILL_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
-    elif any(phrase in msg for phrase in ["remove job", "delete experience", "wasn't employed"]):
-        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_DELETE")
-        return {"category": "EXPERIENCE_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
-    elif any(phrase in msg for phrase in ["remove degree", "delete education", "didn't study"]):
-        print("[DEBUG] classify_message_fallback: Detected EDUCATION_DELETE")
-        return {"category": "EDUCATION_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
-    elif any(phrase in msg for phrase in ["remove project", "delete project", "didn't build"]):
-        print("[DEBUG] classify_message_fallback: Detected PROJECT_DELETE")
-        return {"category": "PROJECT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
-    elif any(phrase in msg for phrase in ["remove contact", "delete email", "no phone"]):
-        print("[DEBUG] classify_message_fallback: Detected CONTACT_DELETE")
-        return {"category": "CONTACT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    # ADDITIONAL READ OPERATIONS
+    elif any(phrase in msg for phrase in ["my objective", "career goal", "professional objective"]):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_SHOW")
+        return {"category": "OBJECTIVE_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my certifications", "licenses", "credentials", "training"]):
+        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_SHOW")
+        return {"category": "CERTIFICATION_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my research", "publications", "papers", "academic work"]):
+        print("[DEBUG] classify_message_fallback: Detected RESEARCH_SHOW")
+        return {"category": "RESEARCH_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my awards", "honors", "achievements", "recognition"]):
+        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_SHOW")
+        return {"category": "ACHIEVEMENT_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my leadership", "leadership roles", "management experience"]):
+        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_SHOW")
+        return {"category": "LEADERSHIP_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my volunteer", "community service", "charitable work"]):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_SHOW")
+        return {"category": "VOLUNTEER_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my languages", "language skills", "spoken languages"]):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_SHOW")
+        return {"category": "LANGUAGE_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my tools", "technologies", "software", "frameworks"]):
+        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_SHOW")
+        return {"category": "TECHNOLOGY_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my hobbies", "interests", "personal interests"]):
+        print("[DEBUG] classify_message_fallback: Detected INTEREST_SHOW")
+        return {"category": "INTEREST_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["my references", "referees", "recommendations"]):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_SHOW")
+        return {"category": "REFERENCE_SHOW", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["additional info", "miscellaneous", "other information"]):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_SHOW")
+        return {"category": "ADDITIONAL_SHOW", "extracted_info": message.strip(), "operation": "READ"}
     
-    # UPDATE OPERATIONS
+    # UPDATE OPERATIONS - Check UPDATE before DELETE to avoid conflicts
     elif any(phrase in msg for phrase in ["update skill", "change skill", "modify skill"]):
         print("[DEBUG] classify_message_fallback: Detected SKILL_UPDATE")
         return {"category": "SKILL_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
@@ -1126,22 +1271,78 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         print("[DEBUG] classify_message_fallback: Detected CONTACT_UPDATE")
         return {"category": "CONTACT_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     
-    # CREATE OPERATIONS
-    elif any(phrase in msg for phrase in ["i learned", "i know", "add skill", "skilled in"]):
+
+    
+    # DELETE OPERATIONS - Moved after UPDATE to avoid conflicts
+    elif any(phrase in msg for phrase in ["remove skill", "delete skill", "don't have skill"]):
+        print("[DEBUG] classify_message_fallback: Detected SKILL_DELETE")
+        return {"category": "SKILL_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove job", "delete experience", "wasn't employed"]):
+        print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_DELETE")
+        return {"category": "EXPERIENCE_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove degree", "delete education", "didn't study"]):
+        print("[DEBUG] classify_message_fallback: Detected EDUCATION_DELETE")
+        return {"category": "EDUCATION_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove project", "delete project", "didn't build"]):
+        print("[DEBUG] classify_message_fallback: Detected PROJECT_DELETE")
+        return {"category": "PROJECT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove contact", "delete email", "no phone"]):
+        print("[DEBUG] classify_message_fallback: Detected CONTACT_DELETE")
+        return {"category": "CONTACT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    
+    # ADDITIONAL DELETE OPERATIONS
+    elif any(phrase in msg for phrase in ["remove objective", "delete goal", "no objective"]):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_DELETE")
+        return {"category": "OBJECTIVE_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove certification", "delete license", "no credential"]):
+        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_DELETE")
+        return {"category": "CERTIFICATION_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove research", "delete publication", "no paper"]):
+        print("[DEBUG] classify_message_fallback: Detected RESEARCH_DELETE")
+        return {"category": "RESEARCH_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove award", "delete achievement", "no honor"]):
+        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_DELETE")
+        return {"category": "ACHIEVEMENT_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove leadership", "delete management", "no role"]):
+        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_DELETE")
+        return {"category": "LEADERSHIP_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove volunteer", "delete service", "no charity"]):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_DELETE")
+        return {"category": "VOLUNTEER_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove language", "delete language skill", "no language"]):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_DELETE")
+        return {"category": "LANGUAGE_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove tool", "delete technology", "no software"]):
+        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_DELETE")
+        return {"category": "TECHNOLOGY_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove hobby", "delete interest", "no passion"]):
+        print("[DEBUG] classify_message_fallback: Detected INTEREST_DELETE")
+        return {"category": "INTEREST_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove reference", "delete referee", "no recommendation"]):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_DELETE")
+        return {"category": "REFERENCE_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    elif any(phrase in msg for phrase in ["remove additional", "delete miscellaneous", "no other"]):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_DELETE")
+        return {"category": "ADDITIONAL_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
+    
+    # CREATE OPERATIONS - Enhanced with all section types
+    elif any(phrase in msg for phrase in ["i learned", "i know", "add skill", "skilled in", "proficient in", "expert in"]):
         print("[DEBUG] classify_message_fallback: Detected SKILL_ADD")
         return {"category": "SKILL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["i worked", "i was employed", "job at", "worked as"]):
+    elif any(phrase in msg for phrase in ["i worked", "i was employed", "job at", "worked as", "position at", "role as"]):
         print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_ADD")
         return {"category": "EXPERIENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["i studied", "graduated from", "degree in", "certification in"]):
+    elif any(phrase in msg for phrase in ["i studied", "graduated from", "degree in", "certification in", "completed course", "attended"]):
         print("[DEBUG] classify_message_fallback: Detected EDUCATION_ADD")
         return {"category": "EDUCATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["i built", "i created", "i developed", "project called"]):
+    elif any(phrase in msg for phrase in ["i built", "i created", "i developed", "project called", "designed", "implemented"]):
         print("[DEBUG] classify_message_fallback: Detected PROJECT_ADD")
         return {"category": "PROJECT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["my email is", "phone number", "linkedin", "address"]):
+    elif any(phrase in msg for phrase in ["my email is", "phone number", "linkedin", "address", "contact me", "reach me"]):
         print("[DEBUG] classify_message_fallback: Detected CONTACT_ADD")
         return {"category": "CONTACT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    
+
     
     # UTILITY OPERATIONS - LinkedIn blog should be checked FIRST with more specific patterns
     elif any(phrase in msg for phrase in ["linkedin blog", "linkedin post", "generate linkedin", "create linkedin", "write linkedin"]):
@@ -1163,24 +1364,21 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         print("[DEBUG] classify_message_fallback: Detected CV_HELP")
         return {"category": "CV_HELP", "extracted_info": message.strip(), "operation": "READ"}
     
-    # LEGACY SUPPORT (backward compatibility)
-    elif any(phrase in msg for phrase in ["skill", "learned", "achieved"]):
+    # LEGACY SUPPORT (backward compatibility) - Removed conflicting patterns
+    elif any(phrase in msg for phrase in ["skill", "learned", "achieved"]) and not any(phrase in msg for phrase in ["objective", "certification", "research", "achievement", "leadership", "volunteer", "language", "technology", "interest", "reference", "additional"]):
         print("[DEBUG] classify_message_fallback: Detected SKILL_ADD")
         return {"category": "SKILL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["worked", "job", "experience"]):
+    elif any(phrase in msg for phrase in ["worked", "job", "experience"]) and not any(phrase in msg for phrase in ["objective", "certification", "research", "achievement", "leadership", "volunteer", "language", "technology", "interest", "reference", "additional"]):
         print("[DEBUG] classify_message_fallback: Detected EXPERIENCE_ADD")
         return {"category": "EXPERIENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["degree", "certification", "education"]):
+    elif any(phrase in msg for phrase in ["degree", "education"]) and not any(phrase in msg for phrase in ["objective", "certification", "research", "achievement", "leadership", "volunteer", "language", "technology", "interest", "reference", "additional"]):
         print("[DEBUG] classify_message_fallback: Detected EDUCATION_ADD")
         return {"category": "EDUCATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["project", "built", "developed", "created", "app", "website", "system"]):
+    elif any(phrase in msg for phrase in ["project", "built", "developed", "created", "app", "website", "system"]) and not any(phrase in msg for phrase in ["objective", "certification", "research", "achievement", "leadership", "volunteer", "language", "technology", "interest", "reference", "additional"]):
         print("[DEBUG] classify_message_fallback: Detected PROJECT_ADD")
         return {"category": "PROJECT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
-    # Check for LinkedIn blog commands more broadly (catch-all)
-    elif any(phrase in msg for phrase in ["linkedin", "blog", "post", "social media"]):
-        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
-        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
+
     
     print("[DEBUG] classify_message_fallback: Detected OTHER")
     return {"category": "OTHER", "extracted_info": message.strip(), "operation": "READ"}
@@ -2781,7 +2979,9 @@ async def chat(request: ChatRequest):
                 response_text = "📄 Please upload a CV first so I can perform operations on your CV content!"
             
             # ===== CREATE OPERATIONS =====
-            elif category in ["SKILL_ADD", "EXPERIENCE_ADD", "EDUCATION_ADD", "PROJECT_ADD", "PROFILE_ADD", "CONTACT_ADD"]:
+            elif category in ["SKILL_ADD", "EXPERIENCE_ADD", "EDUCATION_ADD", "PROJECT_ADD", "PROFILE_ADD", "CONTACT_ADD", 
+                             "OBJECTIVE_ADD", "CERTIFICATION_ADD", "RESEARCH_ADD", "ACHIEVEMENT_ADD", "LEADERSHIP_ADD", 
+                             "VOLUNTEER_ADD", "LANGUAGE_ADD", "TECHNOLOGY_ADD", "INTEREST_ADD", "REFERENCE_ADD", "ADDITIONAL_ADD"]:
                 if cv_content:
                     # Use intelligent content extraction to get main content and auto-detect section
                     extracted_content, detected_section = extract_intelligent_content(request.message)
@@ -2793,7 +2993,18 @@ async def chat(request: ChatRequest):
                         "EDUCATION_ADD": "education",
                         "PROJECT_ADD": "projects",
                         "PROFILE_ADD": "profile",
-                        "CONTACT_ADD": "contact"
+                        "CONTACT_ADD": "contact",
+                        "OBJECTIVE_ADD": "objective",
+                        "CERTIFICATION_ADD": "certifications",
+                        "RESEARCH_ADD": "research",
+                        "ACHIEVEMENT_ADD": "achievements",
+                        "LEADERSHIP_ADD": "leadership",
+                        "VOLUNTEER_ADD": "volunteer",
+                        "LANGUAGE_ADD": "languages",
+                        "TECHNOLOGY_ADD": "technologies",
+                        "INTEREST_ADD": "interests",
+                        "REFERENCE_ADD": "references",
+                        "ADDITIONAL_ADD": "additional"
                     }
                     section_type = section_map.get(category, detected_section)
                     
@@ -2825,7 +3036,9 @@ async def chat(request: ChatRequest):
                             pass
             
             # ===== READ OPERATIONS =====
-            elif category in ["CV_SHOW", "SKILL_SHOW", "EXPERIENCE_SHOW", "EDUCATION_SHOW", "PROJECT_SHOW", "CONTACT_SHOW"]:
+            elif category in ["CV_SHOW", "SKILL_SHOW", "EXPERIENCE_SHOW", "EDUCATION_SHOW", "PROJECT_SHOW", "CONTACT_SHOW",
+                             "OBJECTIVE_SHOW", "CERTIFICATION_SHOW", "RESEARCH_SHOW", "ACHIEVEMENT_SHOW", "LEADERSHIP_SHOW",
+                             "VOLUNTEER_SHOW", "LANGUAGE_SHOW", "TECHNOLOGY_SHOW", "INTEREST_SHOW", "REFERENCE_SHOW", "ADDITIONAL_SHOW"]:
                 if cv_content:
                     section_map = {
                         "CV_SHOW": "cv",
@@ -2833,7 +3046,18 @@ async def chat(request: ChatRequest):
                         "EXPERIENCE_SHOW": "experience",
                         "EDUCATION_SHOW": "education",
                         "PROJECT_SHOW": "projects",
-                        "CONTACT_SHOW": "contact"
+                        "CONTACT_SHOW": "contact",
+                        "OBJECTIVE_SHOW": "objective",
+                        "CERTIFICATION_SHOW": "certifications",
+                        "RESEARCH_SHOW": "research",
+                        "ACHIEVEMENT_SHOW": "achievements",
+                        "LEADERSHIP_SHOW": "leadership",
+                        "VOLUNTEER_SHOW": "volunteer",
+                        "LANGUAGE_SHOW": "languages",
+                        "TECHNOLOGY_SHOW": "technologies",
+                        "INTEREST_SHOW": "interests",
+                        "REFERENCE_SHOW": "references",
+                        "ADDITIONAL_SHOW": "additional"
                     }
                     
                     section_type = section_map.get(category, "cv")
@@ -2855,7 +3079,9 @@ async def chat(request: ChatRequest):
                                 response_text += f"... and {len(projects) - 3} more projects"
             
             # ===== UPDATE OPERATIONS =====
-            elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE", "PROJECT_UPDATE", "PROFILE_UPDATE", "CONTACT_UPDATE"]:
+            elif category in ["SKILL_UPDATE", "EXPERIENCE_UPDATE", "EDUCATION_UPDATE", "PROJECT_UPDATE", "PROFILE_UPDATE", "CONTACT_UPDATE",
+                             "OBJECTIVE_UPDATE", "CERTIFICATION_UPDATE", "RESEARCH_UPDATE", "ACHIEVEMENT_UPDATE", "LEADERSHIP_UPDATE",
+                             "VOLUNTEER_UPDATE", "LANGUAGE_UPDATE", "TECHNOLOGY_UPDATE", "INTEREST_UPDATE", "REFERENCE_UPDATE", "ADDITIONAL_UPDATE"]:
                 if cv_content:
                     # Use intelligent content extraction to get main content and auto-detect section
                     extracted_content, detected_section = extract_intelligent_content(request.message)
@@ -2867,7 +3093,18 @@ async def chat(request: ChatRequest):
                         "EDUCATION_UPDATE": "education", 
                         "PROJECT_UPDATE": "projects",
                         "PROFILE_UPDATE": "profile",
-                        "CONTACT_UPDATE": "contact"
+                        "CONTACT_UPDATE": "contact",
+                        "OBJECTIVE_UPDATE": "objective",
+                        "CERTIFICATION_UPDATE": "certifications",
+                        "RESEARCH_UPDATE": "research",
+                        "ACHIEVEMENT_UPDATE": "achievements",
+                        "LEADERSHIP_UPDATE": "leadership",
+                        "VOLUNTEER_UPDATE": "volunteer",
+                        "LANGUAGE_UPDATE": "languages",
+                        "TECHNOLOGY_UPDATE": "technologies",
+                        "INTEREST_UPDATE": "interests",
+                        "REFERENCE_UPDATE": "references",
+                        "ADDITIONAL_UPDATE": "additional"
                     }
                     section_type = section_map.get(category, detected_section)
                     
@@ -2891,14 +3128,27 @@ async def chat(request: ChatRequest):
                         response_text = f"⚠️ No changes made to your {section_type} section."
             
             # ===== DELETE OPERATIONS =====
-            elif category in ["SKILL_DELETE", "EXPERIENCE_DELETE", "EDUCATION_DELETE", "PROJECT_DELETE", "CONTACT_DELETE"]:
+            elif category in ["SKILL_DELETE", "EXPERIENCE_DELETE", "EDUCATION_DELETE", "PROJECT_DELETE", "CONTACT_DELETE",
+                             "OBJECTIVE_DELETE", "CERTIFICATION_DELETE", "RESEARCH_DELETE", "ACHIEVEMENT_DELETE", "LEADERSHIP_DELETE",
+                             "VOLUNTEER_DELETE", "LANGUAGE_DELETE", "TECHNOLOGY_DELETE", "INTEREST_DELETE", "REFERENCE_DELETE", "ADDITIONAL_DELETE"]:
                 if cv_content:
                     section_map = {
                         "SKILL_DELETE": "skills",
                         "EXPERIENCE_DELETE": "experience",
                         "EDUCATION_DELETE": "education",
                         "PROJECT_DELETE": "projects", 
-                        "CONTACT_DELETE": "contact"
+                        "CONTACT_DELETE": "contact",
+                        "OBJECTIVE_DELETE": "objective",
+                        "CERTIFICATION_DELETE": "certifications",
+                        "RESEARCH_DELETE": "research",
+                        "ACHIEVEMENT_DELETE": "achievements",
+                        "LEADERSHIP_DELETE": "leadership",
+                        "VOLUNTEER_DELETE": "volunteer",
+                        "LANGUAGE_DELETE": "languages",
+                        "TECHNOLOGY_DELETE": "technologies",
+                        "INTEREST_DELETE": "interests",
+                        "REFERENCE_DELETE": "references",
+                        "ADDITIONAL_DELETE": "additional"
                     }
                     
                     section_type = section_map.get(category, "skills")
@@ -3246,12 +3496,11 @@ def format_cv_for_display(cv_content: str) -> str:
                     formatted_lines.append("")
                 # Clean up the header (remove underscores, format nicely)
                 clean_header = line.replace('_', '').strip()
-                formatted_lines.append(f"📋 {clean_header}")
-                formatted_lines.append("─" * (len(clean_header) + 5))  # Add underline
+                formatted_lines.append(clean_header)  # Remove emoji and underlines
             else:
                 # Clean up bullet points and formatting
                 if line.startswith('•') or line.startswith('-') or line.startswith('*'):
-                    formatted_lines.append(f"  • {line[1:].strip()}")
+                    formatted_lines.append(f"• {line[1:].strip()}")  # Keep bullet points clean
                 else:
                     formatted_lines.append(line)
         
