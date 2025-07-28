@@ -534,6 +534,10 @@ function ProjectManagementPage() {
   // CV Upload states
   const [showCVUpload, setShowCVUpload] = useState(false);
   
+  // PDF Preview states
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  
   const navigate = useNavigate();
   const { theme } = useTheme();
 
@@ -869,6 +873,9 @@ function ProjectManagementPage() {
     }
     try {
       console.log('🔄 Downloading CV with selected projects:', selectedProjects);
+      console.log('🔄 Request payload:', { selected_project_ids: selectedProjects });
+      console.log('🔄 Projects data:', projects);
+      console.log('🔄 Selected project IDs type:', typeof selectedProjects[0]);
       
       const response = await axios.post(
         `${API_BASE_URL}/cv/download-with-selected-projects`,
@@ -923,6 +930,35 @@ function ProjectManagementPage() {
     loadProjects();
     setShowCVUpload(false);
     addChatMessage(`✅ Successfully extracted ${extractedProjects.length} projects from your CV!`);
+  };
+
+  // Load PDF preview for downloaded CV
+  const loadPdfPreview = async () => {
+    try {
+      if (selectedProjects.length === 0) {
+        alert('Please select at least one project to include in your CV.');
+        return;
+      }
+
+      const response = await axios.post(
+        `${API_BASE_URL}/cv/download-with-selected-projects`,
+        { selected_project_ids: selectedProjects },
+        { responseType: 'blob' }
+      );
+      
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Received empty PDF data');
+      }
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      setShowPdfPreview(true);
+    } catch (error) {
+      console.error('Error loading PDF preview:', error);
+      setPdfUrl(null);
+      alert('Error loading PDF preview. Please try again.');
+    }
   };
 
   return (
@@ -1020,17 +1056,55 @@ function ProjectManagementPage() {
                   ))}
                 </ProjectsGrid>
               )}
-              {/* Download button for selected projects */}
-              <Button
-                theme={theme}
-                variant="primary"
-                onClick={handleDownloadCVWithSelectedProjects}
-                disabled={selectedProjects.length === 0}
-                style={{ marginTop: 20 }}
-              >
-                Download CV (Selected Projects)
-              </Button>
+              {/* Download and Preview buttons for selected projects */}
+              <div style={{ display: 'flex', gap: '15px', marginTop: 20 }}>
+                <Button
+                  theme={theme}
+                  variant="primary"
+                  onClick={loadPdfPreview}
+                  disabled={selectedProjects.length === 0}
+                >
+                  📄 Preview CV
+                </Button>
+                <Button
+                  theme={theme}
+                  variant="primary"
+                  onClick={handleDownloadCVWithSelectedProjects}
+                  disabled={selectedProjects.length === 0}
+                >
+                  📥 Download CV
+                </Button>
+              </div>
             </ProjectsContainer>
+
+            {/* PDF Preview Section */}
+            {showPdfPreview && pdfUrl && (
+              <ProjectsContainer theme={theme} style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h3 style={{ margin: 0, color: theme.colors.textPrimary }}>📄 CV Preview (Selected Projects)</h3>
+                  <Button
+                    theme={theme}
+                    variant="secondary"
+                    onClick={() => {
+                      setShowPdfPreview(false);
+                      setPdfUrl(null);
+                      if (pdfUrl) {
+                        URL.revokeObjectURL(pdfUrl);
+                      }
+                    }}
+                  >
+                    ✕ Close
+                  </Button>
+                </div>
+                <div style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+                  <iframe
+                    src={pdfUrl}
+                    style={{ width: '100%', height: '600px', border: 'none' }}
+                    title="CV PDF Preview"
+                  />
+                </div>
+              </ProjectsContainer>
+            )}
           </LeftPanel>
 
           <RightPanel>

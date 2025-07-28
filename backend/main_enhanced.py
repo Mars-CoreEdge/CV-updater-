@@ -432,7 +432,7 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
         for contact in contact_info:
             pdf.cell(0, 6, contact, ln=True, align='C')
 
-    pdf.ln(10)
+    pdf.ln(1)
 
     # Improved section/heading detection and decoration
     section_keywords = ['PROFILE', 'SUMMARY', 'SKILLS', 'EXPERIENCE', 'EDUCATION', 'PROJECTS', 'ABOUT', 'CERTIFICATIONS', 'ACHIEVEMENTS', 'CONTACT']
@@ -446,14 +446,14 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
             any(kw in line.upper() for kw in section_keywords)
         )
         if is_header:
-            pdf.ln(6)  # Extra space before section
+            pdf.ln(1)  # Extra space before section
             if use_custom_font:
                 pdf.set_font('DejaVu', 'B', 14)
             else:
                 pdf.set_font('Arial', 'B', 14)
             pdf.set_fill_color(230, 236, 245)
             pdf.cell(0, 10, line.title(), ln=True, fill=True)
-            pdf.ln(2)
+            pdf.ln(1)
         else:
             # Bullet points
             if line.startswith('-') or line.startswith('*'):
@@ -486,7 +486,7 @@ def _write_section_to_pdf(pdf, section_name: str, content_lines: list, use_custo
         pdf.set_font('Arial', 'B', 14)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(0, 8, section_name.upper(), ln=True, fill=True)
-    pdf.ln(2)
+    pdf.ln(1)
     
     # Section content
     if use_custom_font:
@@ -514,7 +514,7 @@ def _write_section_to_pdf(pdf, section_name: str, content_lines: list, use_custo
             else:
                 pdf.cell(0, 6, line.strip(), ln=True)
     
-    pdf.ln(5)
+    pdf.ln(1)
 
 # Advanced PDF Processing Libraries
 try:
@@ -2366,6 +2366,9 @@ def _generate_cv_with_projects_internal(cursor, conn) -> str:
     
     original_cv = cv_row[0]
     
+    # Reorganize CV content to ensure proper section placement
+    original_cv = reorganize_cv_content(original_cv)
+    
     # Clean up any existing duplicate sections first
     original_cv = clean_duplicate_project_sections(original_cv)
     
@@ -2772,6 +2775,16 @@ async def test_endpoint():
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
+
+@app.post("/test-download")
+async def test_download_endpoint(request: ProjectSelectionRequest):
+    """Test endpoint to debug download issues"""
+    return {
+        "message": "Test endpoint working",
+        "received_ids": request.selected_project_ids,
+        "ids_type": str(type(request.selected_project_ids)),
+        "ids_length": len(request.selected_project_ids) if request.selected_project_ids else 0
+    }
 
 @app.post("/upload-cv/")
 async def upload_cv(
@@ -4563,6 +4576,75 @@ def reorganize_cv_content(cv_content: str) -> str:
                 current_section = 'projects'
                 continue
             
+            # Smart content classification for unorganized content
+            if line_stripped and current_section == 'personal_info':
+                # Enhanced parsing for pipe-separated content
+                if '|' in line_stripped and len(line_stripped) > 100:
+                    # Split by pipes and analyze each part
+                    parts = [part.strip() for part in line_stripped.split('|')]
+                    
+                    # Keep contact info in personal_info
+                    contact_parts = []
+                    experience_parts = []
+                    education_parts = []
+                    
+                    for part in parts:
+                        part_lower = part.lower()
+                        
+                        # Contact information (phone, email)
+                        if re.search(r'[\+\d\-\(\)\s]+', part) or '@' in part or 'gmail' in part_lower or 'yahoo' in part_lower:
+                            contact_parts.append(part)
+                        
+                        # Experience content
+                        elif (re.search(r'\b(internship|job|position|role|worked|employed)\b', part_lower) or
+                              re.search(r'\b(202[0-9]|201[0-9])\s*[-–]\s*(202[0-9]|201[0-9]|present|current|now)\b', part) or
+                              re.search(r'\b(company|corp|inc|ltd|soft|tech|solutions)\b', part_lower)):
+                            experience_parts.append(part)
+                        
+                        # Education content
+                        elif (re.search(r'\b(graduated|degree|university|college|school|bachelor|master|phd)\b', part_lower) or
+                              re.search(r'\b(202[0-9]|201[0-9])\b', part) and 'graduated' in part_lower):
+                            education_parts.append(part)
+                        
+                        # Profile/summary content
+                        else:
+                            # This might be profile summary content
+                            if len(part) > 20 and not re.search(r'\b(202[0-9]|201[0-9])\b', part):
+                                organized_sections['profile_summary'].append(part)
+                    
+                    # Add contact parts to personal_info
+                    if contact_parts:
+                        organized_sections['personal_info'].append(' | '.join(contact_parts))
+                    
+                    # Add experience parts to experience section
+                    if experience_parts:
+                        organized_sections['experience'].extend(experience_parts)
+                    
+                    # Add education parts to education section
+                    if education_parts:
+                        organized_sections['education'].extend(education_parts)
+                    
+                    continue
+                
+                # Check if this line contains education-related content
+                if (re.search(r'\b(202[0-9]|201[0-9]|202[0-9])\b', line_stripped) or  # Years
+                    re.search(r'\b(graduated|degree|university|college|school|bachelor|master|phd)\b', line_stripped, re.IGNORECASE)):
+                    current_section = 'education'
+                    organized_sections['education'].append(line_stripped)
+                    continue
+                # Check if this line contains experience-related content
+                elif (re.search(r'\b(experience|worked|job|position|role|employed|internship)\b', line_stripped, re.IGNORECASE) or
+                      re.search(r'\b(202[0-9]|201[0-9])\s*[-–]\s*(present|current|now)\b', line_stripped, re.IGNORECASE)):
+                    current_section = 'experience'
+                    organized_sections['experience'].append(line_stripped)
+                    continue
+                # Check if this line contains skills-related content
+                elif (re.search(r'\b(react|javascript|python|java|html|css|node|sql|aws|docker)\b', line_stripped, re.IGNORECASE) or
+                      re.search(r'\b(skills|technologies|tools|frameworks|languages)\b', line_stripped, re.IGNORECASE)):
+                    current_section = 'skills'
+                    organized_sections['skills'].append(line_stripped)
+                continue
+            
             # Add content to current section (include non-empty lines)
             if line_stripped and current_section:
                 organized_sections[current_section].append(line_stripped)
@@ -4639,15 +4721,15 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
         accent_color = HexColor('#667eea')
         
         header_style = ParagraphStyle(
-            'Header', parent=styles['Heading1'], fontSize=24, spaceAfter=12, alignment=TA_CENTER, textColor=accent_color
+            'Header', parent=styles['Heading1'], fontSize=24, spaceAfter=8, alignment=TA_CENTER, textColor=accent_color
         )
         
         contact_style = ParagraphStyle(
-            'Contact', parent=styles['Normal'], fontSize=10, spaceAfter=20, alignment=TA_CENTER, textColor=black
+            'Contact', parent=styles['Normal'], fontSize=10, spaceAfter=8, alignment=TA_CENTER, textColor=black
         )
         
         section_style = ParagraphStyle(
-            'Section', parent=styles['Heading2'], fontSize=16, spaceAfter=12, spaceBefore=20, textColor=accent_color
+            'Section', parent=styles['Heading2'], fontSize=16, spaceAfter=6, spaceBefore=8, textColor=accent_color
         )
         
         job_title_style = ParagraphStyle(
@@ -4659,15 +4741,15 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
         )
         
         body_style = ParagraphStyle(
-            'Body', parent=styles['Normal'], fontSize=11, spaceAfter=8, alignment=TA_JUSTIFY
+            'Body', parent=styles['Normal'], fontSize=11, spaceAfter=4, alignment=TA_JUSTIFY
         )
         
         skill_style = ParagraphStyle(
-            'Skill', parent=styles['Normal'], fontSize=10, spaceAfter=6, textColor=accent_color
+            'Skill', parent=styles['Normal'], fontSize=10, spaceAfter=3, textColor=accent_color
         )
         
         bullet_style = ParagraphStyle(
-            'Bullet', parent=styles['Normal'], fontSize=10, spaceAfter=4, leftIndent=20
+            'Bullet', parent=styles['Normal'], fontSize=10, spaceAfter=2, leftIndent=20
         )
         
         # Build PDF content
@@ -4708,11 +4790,11 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
         if contact_info:
             contact_text = " | ".join(contact_info)
             story.append(Paragraph(contact_text, contact_style))
-        story.append(Spacer(1, 25))
+        story.append(Spacer(1, 12))
         
         # Add divider
         divider_style = ParagraphStyle(
-            'Divider', parent=styles['Normal'], fontSize=2, spaceAfter=25, spaceBefore=25, alignment=TA_CENTER, textColor=accent_color
+            'Divider', parent=styles['Normal'], fontSize=2, spaceAfter=8, spaceBefore=8, alignment=TA_CENTER, textColor=accent_color
         )
         story.append(Paragraph("_" * 60, divider_style))
         
@@ -4729,7 +4811,7 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
                     # Replace this section with the selected projects
                     story.append(Paragraph('Projects', section_style))
                     underline_style = ParagraphStyle(
-                        'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=20, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
+                        'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=15, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
                     )
                     story.append(Paragraph("_" * 50, underline_style))
                     
@@ -4765,7 +4847,7 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
                 section_text = section_title.replace('_', ' ').title()
                 story.append(Paragraph(section_text, section_style))
                 underline_style = ParagraphStyle(
-                    'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=20, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
+                    'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=15, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
                 )
                 story.append(Paragraph("_" * 50, underline_style))
                 
@@ -4793,7 +4875,7 @@ def generate_cv_pdf(cv_content: str, projects: List[dict]) -> BytesIO:
         if projects and len(projects) > 0 and not inserted_projects:
             story.append(Paragraph('Projects', section_style))
             underline_style = ParagraphStyle(
-                'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=20, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
+                'Underline', parent=styles['Normal'], fontSize=1, spaceAfter=15, spaceBefore=0, alignment=TA_LEFT, textColor=accent_color
             )
             story.append(Paragraph("_" * 50, underline_style))
             for i, project in enumerate(projects, 1):
@@ -5005,7 +5087,12 @@ async def download_cv():
 
 @app.post("/cv/download-with-selected-projects")
 async def download_cv_with_selected_projects(request: ProjectSelectionRequest):
-    selected_project_ids = request.selected_project_ids
+    print(f"🔍 Received request: {request}")
+    print(f"🔍 Selected project IDs: {request.selected_project_ids}")
+    
+    # Simple validation - just check if we have any IDs
+    selected_project_ids = request.selected_project_ids or []
+    print(f"🔍 Processed project IDs: {selected_project_ids}")
     try:
         with get_db_cursor_context() as (cursor, conn):
             # Always update CV before download
