@@ -909,15 +909,17 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
       // Helper function to add section header
       const addSectionHeader = (title) => {
         checkPageBreak(20);
-        yPosition += 5; // Extra space before section
+        yPosition += 10; // Extra space before section
         
-        // Add section line
+        // Add section title first
+        addFormattedText(title, 14, 'bold');
+        
+        // Add section line below the text
         pdf.setDrawColor(102, 126, 234);
         pdf.setLineWidth(0.5);
-        pdf.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+        pdf.line(margin, yPosition + 2, pageWidth - margin, yPosition + 2);
         
-        addFormattedText(title, 14, 'bold');
-        yPosition += 3; // Space after header
+        yPosition += 10; // Space after header and line
       };
       
       // Parse CV content intelligently
@@ -961,9 +963,9 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
         } else if (isHeader) {
           addSectionHeader(line);
         } else {
-          // Regular content
-          let fontSize = 11;
-          let style = 'normal';
+          // Regular content - smaller text under headings
+          let fontSize = 9;  // Reduced from 11 to 9
+          let style = 'bold';  // Changed from 'normal' to 'bold' for better readability
           
           // Format based on content type
           if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import CVUploadForProjects from '../components/CVUploadForProjects';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
@@ -530,6 +531,9 @@ function ProjectManagementPage() {
   
   const [selectedProjects, setSelectedProjects] = useState([]); // <-- Add this state
   
+  // CV Upload states
+  const [showCVUpload, setShowCVUpload] = useState(false);
+  
   const navigate = useNavigate();
   const { theme } = useTheme();
 
@@ -911,6 +915,16 @@ function ProjectManagementPage() {
     }
   };
 
+  // Handle projects extracted from CV
+  const handleProjectsExtracted = (extractedProjects) => {
+    console.log('Projects extracted from CV:', extractedProjects);
+    // The projects will be automatically loaded by the loadProjects function
+    // since they're stored in the database
+    loadProjects();
+    setShowCVUpload(false);
+    addChatMessage(`✅ Successfully extracted ${extractedProjects.length} projects from your CV!`);
+  };
+
   return (
     <PageContainer theme={theme}>
       <ContentWrapper>
@@ -933,10 +947,20 @@ function ProjectManagementPage() {
               <Button theme={theme} variant="primary" onClick={() => openModal()}>
                 ➕ Add New Project
               </Button>
+              <Button theme={theme} onClick={() => setShowCVUpload(!showCVUpload)}>
+                📄 {showCVUpload ? 'Hide CV Upload' : 'Extract from CV'}
+              </Button>
               <Button theme={theme} onClick={addProjectsToCV}>
                 📄 Add All to CV
               </Button>
             </ActionBar>
+
+            {/* CV Upload Section */}
+            {showCVUpload && (
+              <ProjectsContainer theme={theme} style={{ marginBottom: '20px' }}>
+                <CVUploadForProjects onProjectsExtracted={handleProjectsExtracted} />
+              </ProjectsContainer>
+            )}
 
             <ProjectsContainer theme={theme}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.colors.textPrimary }}>Your Projects</h2>

@@ -1096,7 +1096,48 @@ Return JSON: {{"category": "CATEGORY", "extracted_info": "specific details", "ta
 def classify_message_fallback(message: str, cv_content: str = None) -> dict:
     """Enhanced fallback classification with full CRUD support and better education detection"""
     msg = message.lower()
-    print(f"[DEBUG] classify_message_fallback: message='{message}'")
+    print(f"[DEBUG] classify_message_fallback: message='{message}' (lower='{msg}')")
+
+    # SPECIFIC ADD OPERATIONS - Check these FIRST before any other patterns
+    print(f"[DEBUG] UPDATED CODE VERSION - Checking OBJECTIVE_ADD: add/insert/put/append in msg? {any(kw in msg for kw in ['add', 'include', 'insert', 'put', 'append'])}, objective/goal in msg? {any(kw in msg for kw in ['objective', 'goal', 'career objective', 'professional objective'])}")
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD")
+        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("volunteer" in msg or "community service" in msg or "charity" in msg or "pro bono" in msg):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_ADD")
+        return {"category": "VOLUNTEER_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("language" in msg or "speak" in msg or "fluent in" in msg or "proficient in" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_ADD")
+        return {"category": "LANGUAGE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("reference" in msg or "referee" in msg or "recommendation" in msg or "endorsement" in msg):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_ADD")
+        return {"category": "REFERENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("additional" in msg or "miscellaneous" in msg or "other" in msg or "extra" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_ADD")
+        return {"category": "ADDITIONAL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("hobby" in msg or "interest" in msg or "passion" in msg or "enjoy" in msg or "like to" in msg):
+        print("[DEBUG] classify_message_fallback: Detected INTEREST_ADD")
+        return {"category": "INTEREST_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+
+    # UTILITY OPERATIONS - Check these AFTER specific ADD patterns
+    elif any(phrase in msg for phrase in ["linkedin blog", "linkedin post", "generate linkedin", "create linkedin", "write linkedin"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
+        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
+    elif any(phrase in msg for phrase in ["generate a linkedin", "create a linkedin", "write a linkedin", "generate linkedin post", "create linkedin post", "write linkedin post"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
+        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
+    elif any(phrase in msg for phrase in ["generate blog", "create blog", "write blog"]) and not any(phrase in msg for phrase in ["contact", "email", "phone", "address"]):
+        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
+        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
+    elif any(phrase in msg for phrase in ["generate cv", "create cv", "make cv", "build cv"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_GENERATE")
+        return {"category": "CV_GENERATE", "extracted_info": message.strip(), "operation": "READ"}
+    elif any(phrase in msg for phrase in ["clean cv", "fix duplicates", "organize cv"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_CLEANUP")
+        return {"category": "CV_CLEANUP", "extracted_info": message.strip(), "operation": "UPDATE"}
+    elif any(phrase in msg for phrase in ["help", "what can you do", "commands", "how to use"]) and not any(phrase in msg for phrase in ["add", "include", "insert", "put", "append", "objective", "volunteer", "language", "reference", "additional"]):
+        print("[DEBUG] classify_message_fallback: Detected CV_HELP")
+        return {"category": "CV_HELP", "extracted_info": message.strip(), "operation": "READ"}
 
     # PROJECT MANAGEMENT COMMANDS
     if any(phrase in msg for phrase in ["extract projects", "extract from cv", "get projects from cv", "parse projects"]):
@@ -1165,39 +1206,7 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         return {"category": "ADDITIONAL_UPDATE", "extracted_info": message.strip(), "operation": "UPDATE"}
     
     # ADD OPERATIONS - More specific patterns to avoid catching UPDATE messages
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg):
-        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD")
-        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("certification" in msg or "license" in msg or "certificate" in msg or "credential" in msg or "training" in msg):
-        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_ADD")
-        return {"category": "CERTIFICATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("research" in msg or "publication" in msg or "paper" in msg or "thesis" in msg or "dissertation" in msg):
-        print("[DEBUG] classify_message_fallback: Detected RESEARCH_ADD")
-        return {"category": "RESEARCH_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("award" in msg or "honor" in msg or "achievement" in msg or "recognition" in msg or "scholarship" in msg):
-        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_ADD")
-        return {"category": "ACHIEVEMENT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("leadership" in msg or "led" in msg or "managed" in msg or "supervised" in msg or "directed" in msg):
-        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_ADD")
-        return {"category": "LEADERSHIP_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("volunteer" in msg or "community service" in msg or "charity" in msg or "pro bono" in msg):
-        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_ADD")
-        return {"category": "VOLUNTEER_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("language" in msg or "speak" in msg or "fluent in" in msg or "proficient in" in msg):
-        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_ADD")
-        return {"category": "LANGUAGE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("tool" in msg or "technology" in msg or "technologies" in msg or "software" in msg or "framework" in msg or "platform" in msg):
-        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_ADD")
-        return {"category": "TECHNOLOGY_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("hobby" in msg or "interest" in msg or "passion" in msg or "enjoy" in msg or "like to" in msg):
-        print("[DEBUG] classify_message_fallback: Detected INTEREST_ADD")
-        return {"category": "INTEREST_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("reference" in msg or "referee" in msg or "recommendation" in msg or "endorsement" in msg):
-        print("[DEBUG] classify_message_fallback: Detected REFERENCE_ADD")
-        return {"category": "REFERENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("additional" in msg or "miscellaneous" in msg or "other" in msg or "extra" in msg):
-        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_ADD")
-        return {"category": "ADDITIONAL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    # Note: Specific ADD patterns moved to the top to be checked before education patterns
     
     # READ OPERATIONS
     if any(phrase in msg for phrase in ["show cv", "display cv", "my cv", "current cv"]):
@@ -1325,6 +1334,24 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_DELETE")
         return {"category": "ADDITIONAL_DELETE", "extracted_info": message.strip(), "operation": "DELETE"}
     
+    # SPECIFIC ADD OPERATIONS - Check these BEFORE legacy patterns
+    print(f"[DEBUG] Checking OBJECTIVE_ADD: add/insert/put/append in msg? {any(kw in msg for kw in ['add', 'include', 'insert', 'put', 'append'])}, objective/goal in msg? {any(kw in msg for kw in ['objective', 'goal', 'career objective', 'professional objective'])}")
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD")
+        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("volunteer" in msg or "community service" in msg or "charity" in msg or "pro bono" in msg):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_ADD")
+        return {"category": "VOLUNTEER_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("language" in msg or "speak" in msg or "fluent in" in msg or "proficient in" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_ADD")
+        return {"category": "LANGUAGE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("reference" in msg or "referee" in msg or "recommendation" in msg or "endorsement" in msg):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_ADD")
+        return {"category": "REFERENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("additional" in msg or "miscellaneous" in msg or "other" in msg or "extra" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_ADD")
+        return {"category": "ADDITIONAL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    
     # CREATE OPERATIONS - Enhanced with all section types
     elif any(phrase in msg for phrase in ["i learned", "i know", "add skill", "skilled in", "proficient in", "expert in"]):
         print("[DEBUG] classify_message_fallback: Detected SKILL_ADD")
@@ -1343,26 +1370,6 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
         return {"category": "CONTACT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
 
-    
-    # UTILITY OPERATIONS - LinkedIn blog should be checked FIRST with more specific patterns
-    elif any(phrase in msg for phrase in ["linkedin blog", "linkedin post", "generate linkedin", "create linkedin", "write linkedin"]):
-        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
-        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["generate a linkedin", "create a linkedin", "write a linkedin", "generate linkedin post", "create linkedin post", "write linkedin post"]):
-        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
-        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["generate blog", "create blog", "write blog"]) and not any(phrase in msg for phrase in ["contact", "email", "phone", "address"]):
-        print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
-        return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["generate cv", "create cv", "make cv", "build cv"]):
-        print("[DEBUG] classify_message_fallback: Detected CV_GENERATE")
-        return {"category": "CV_GENERATE", "extracted_info": message.strip(), "operation": "READ"}
-    elif any(phrase in msg for phrase in ["clean cv", "fix duplicates", "organize cv"]):
-        print("[DEBUG] classify_message_fallback: Detected CV_CLEANUP")
-        return {"category": "CV_CLEANUP", "extracted_info": message.strip(), "operation": "UPDATE"}
-    elif any(phrase in msg for phrase in ["help", "what can you do", "commands", "how to use"]):
-        print("[DEBUG] classify_message_fallback: Detected CV_HELP")
-        return {"category": "CV_HELP", "extracted_info": message.strip(), "operation": "READ"}
     
     # LEGACY SUPPORT (backward compatibility) - Removed conflicting patterns
     elif any(phrase in msg for phrase in ["skill", "learned", "achieved"]) and not any(phrase in msg for phrase in ["objective", "certification", "research", "achievement", "leadership", "volunteer", "language", "technology", "interest", "reference", "additional"]):
