@@ -2233,6 +2233,226 @@ def extract_contact_from_message(message: str) -> str:
     clean_message = re.sub(r'^(my email is|phone number|my phone|contact|address)\s*', '', message.lower()).strip()
     return clean_message
 
+def extract_universal_cv_content(message: str) -> tuple[str, str]:
+    """
+    🧠 Universal CV Section Extractor
+    Automatically detects the relevant CV section and extracts only the relevant content.
+    
+    Returns: (section_name, extracted_content)
+    """
+    message_lower = message.lower().strip()
+    
+    # Define section-specific extraction patterns
+    section_patterns = {
+        # Education patterns
+        'education': {
+            'keywords': ['education', 'academic', 'degree', 'university', 'college', 'school', 'graduated', 'bachelor', 'master', 'phd', 'mba'],
+            'patterns': [
+                r'(?:i\s+(?:have\s+)?(?:done|completed|graduated|studied|pursued|obtained|earned)\s+)?([^,\.]+?(?:degree|masters?|bachelors?|phd|mba|certification)[^,\.]*(?:from|at|in)\s+[^,\.]+)',
+                r'(?:degree|masters?|bachelors?|phd|mba)\s+(?:in|of)\s+([^,\.]+?)(?:\s+from|\s+at|\s+in\s+\d{4}|$)',
+                r'(?:graduated|completed|studied)\s+(?:in\s+\d{4}\s+)?(?:from|at)\s+([^,\.]+)',
+                r'([^,\.]+?(?:university|college|institute|school)[^,\.]*)'
+            ]
+        },
+        
+        # Experience patterns
+        'experience': {
+            'keywords': ['experience', 'worked', 'job', 'position', 'role', 'employed', 'internship', 'work', 'career'],
+            'patterns': [
+                r'(?:i\s+(?:have\s+)?(?:worked|served|acted)\s+as\s+)?([^,\.]+?(?:engineer|developer|manager|analyst|consultant|specialist|coordinator|assistant|director|lead|architect)[^,\.]*(?:at|for|with)\s+[^,\.]+)',
+                r'(?:position|role|job)\s+(?:as\s+)?([^,\.]+?)(?:\s+at|\s+for|\s+with|$)',
+                r'(?:worked|employed)\s+(?:as\s+)?([^,\.]+?)(?:\s+at|\s+for|\s+with|$)',
+                r'([^,\.]+?(?:company|corp|inc|ltd|soft|tech|solutions|systems)[^,\.]*)'
+            ]
+        },
+        
+        # Skills patterns
+        'skills': {
+            'keywords': ['skills', 'skilled', 'proficient', 'expertise', 'technologies', 'tools', 'frameworks'],
+            'patterns': [
+                r'(?:skilled|proficient|expert|knowledge)\s+(?:in\s+)?([^,\.]+)',
+                r'(?:technologies?|tools?|frameworks?|skills?)\s*:\s*([^,\.]+)',
+                r'(?:i\s+(?:am\s+)?(?:skilled|proficient|expert)\s+in\s+)?([^,\.]+)',
+                r'([a-zA-Z\s,]+(?:python|javascript|java|c\+\+|react|node|angular|vue|sql|aws|docker|kubernetes|git|html|css|php|ruby|go|rust|swift|kotlin)[a-zA-Z\s,]*)'
+            ]
+        },
+        
+        # Certifications patterns
+        'certifications': {
+            'keywords': ['certification', 'certified', 'license', 'course', 'training', 'credential'],
+            'patterns': [
+                r'(?:certification|certified|license)\s+(?:in\s+)?([^,\.]+)',
+                r'(?:completed|obtained|earned)\s+(?:certification|certificate|license)\s+(?:in\s+)?([^,\.]+)',
+                r'([^,\.]+?(?:certification|certificate|license)[^,\.]*)',
+                r'(?:course|training)\s+(?:in\s+)?([^,\.]+)'
+            ]
+        },
+        
+        # Projects patterns
+        'projects': {
+            'keywords': ['project', 'built', 'developed', 'created', 'designed', 'implemented'],
+            'patterns': [
+                r'(?:built|developed|created|designed|implemented)\s+(?:a\s+)?([^,\.]+?(?:project|app|website|system|platform|tool)[^,\.]*)',
+                r'(?:project|app|website|system)\s+(?:called\s+)?([^,\.]+)',
+                r'([^,\.]+?(?:project|application|website|system|platform)[^,\.]*)'
+            ]
+        },
+        
+        # Research patterns
+        'research': {
+            'keywords': ['research', 'published', 'paper', 'thesis', 'dissertation', 'study'],
+            'patterns': [
+                r'(?:research|study|paper|thesis|dissertation)\s+(?:on\s+)?([^,\.]+)',
+                r'(?:published|wrote|conducted)\s+(?:research|paper|study)\s+(?:on\s+)?([^,\.]+)',
+                r'([^,\.]+?(?:research|paper|study|thesis)[^,\.]*)'
+            ]
+        },
+        
+        # Achievements patterns
+        'achievements': {
+            'keywords': ['achievement', 'award', 'honor', 'recognition', 'distinction', 'scholarship'],
+            'patterns': [
+                r'(?:achievement|award|honor|recognition|distinction)\s+(?:for\s+)?([^,\.]+)',
+                r'(?:received|won|earned)\s+(?:award|honor|recognition|scholarship)\s+(?:for\s+)?([^,\.]+)',
+                r'([^,\.]+?(?:award|honor|recognition|scholarship)[^,\.]*)'
+            ]
+        },
+        
+        # Leadership patterns
+        'leadership': {
+            'keywords': ['leadership', 'led', 'managed', 'supervised', 'coordinated', 'organized'],
+            'patterns': [
+                r'(?:led|managed|supervised|coordinated|organized)\s+([^,\.]+)',
+                r'(?:leadership|management)\s+(?:role|position)\s+(?:as\s+)?([^,\.]+)',
+                r'(?:team\s+)?(?:lead|manager|supervisor|coordinator)\s+(?:of\s+)?([^,\.]+)'
+            ]
+        },
+        
+        # Volunteer patterns
+        'volunteer': {
+            'keywords': ['volunteer', 'volunteering', 'community', 'service', 'charity'],
+            'patterns': [
+                r'(?:volunteered|volunteering)\s+(?:for|at|with)\s+([^,\.]+)',
+                r'(?:community|charity)\s+(?:service|work)\s+(?:for|at|with)\s+([^,\.]+)',
+                r'([^,\.]+?(?:volunteer|community|charity)[^,\.]*)'
+            ]
+        },
+        
+        # Languages patterns
+        'languages': {
+            'keywords': ['language', 'speak', 'fluent', 'proficient', 'bilingual'],
+            'patterns': [
+                r'(?:speak|fluent|proficient)\s+(?:in\s+)?([^,\.]+)',
+                r'(?:language|languages?)\s*:\s*([^,\.]+)',
+                r'(?:bilingual|trilingual|multilingual)\s+(?:in\s+)?([^,\.]+)',
+                r'([a-zA-Z\s,]+(?:english|spanish|french|german|chinese|japanese|arabic|hindi|urdu|portuguese|italian|russian)[a-zA-Z\s,]*)'
+            ]
+        },
+        
+        # Tools patterns
+        'tools': {
+            'keywords': ['tools', 'software', 'platforms', 'systems', 'environments'],
+            'patterns': [
+                r'(?:tools?|software|platforms?|systems?)\s*:\s*([^,\.]+)',
+                r'(?:proficient|skilled)\s+(?:with|in)\s+([^,\.]+)',
+                r'([^,\.]+?(?:tools|software|platform|system)[^,\.]*)'
+            ]
+        },
+        
+        # Hobbies patterns
+        'hobbies': {
+            'keywords': ['hobby', 'hobbies', 'interest', 'interests', 'passion', 'enjoy'],
+            'patterns': [
+                r'(?:hobby|hobbies|interest|interests)\s*:\s*([^,\.]+)',
+                r'(?:enjoy|love|passionate)\s+(?:about\s+)?([^,\.]+)',
+                r'(?:free\s+time|leisure)\s+(?:activities?|hobbies?)\s*:\s*([^,\.]+)'
+            ]
+        },
+        
+        # References patterns
+        'references': {
+            'keywords': ['reference', 'referee', 'contact', 'available'],
+            'patterns': [
+                r'(?:reference|referee)\s+(?:from\s+)?([^,\.]+)',
+                r'(?:contact|available)\s+(?:upon\s+)?(?:request\s+)?([^,\.]+)',
+                r'([^,\.]+?(?:reference|referee)[^,\.]*)'
+            ]
+        },
+        
+        # Additional patterns
+        'additional': {
+            'keywords': ['additional', 'miscellaneous', 'other', 'extra', 'supplementary'],
+            'patterns': [
+                r'(?:additional|miscellaneous|other|extra)\s+(?:information|details)\s*:\s*([^,\.]+)',
+                r'([^,\.]+?(?:additional|miscellaneous|supplementary)[^,\.]*)'
+            ]
+        }
+    }
+    
+    # Find the most likely section based on keywords
+    best_section = None
+    best_score = 0
+    
+    # First, check for specific language indicators (highest priority)
+    language_indicators = ['chinese', 'english', 'spanish', 'french', 'german', 'italian', 'portuguese', 'russian', 'japanese', 'korean', 'arabic', 'hindi', 'urdu', 'bengali', 'tamil', 'telugu', 'marathi', 'gujarati', 'kannada', 'malayalam', 'punjabi', 'sindhi', 'nepali', 'thai', 'vietnamese', 'indonesian', 'malay', 'filipino', 'tagalog', 'dutch', 'swedish', 'norwegian', 'danish', 'finnish', 'polish', 'czech', 'slovak', 'hungarian', 'romanian', 'bulgarian', 'serbian', 'croatian', 'greek', 'turkish', 'hebrew', 'persian', 'farsi', 'kurdish', 'armenian', 'georgian', 'mongolian', 'tibetan', 'lao', 'cambodian', 'khmer', 'burmese', 'myanmar']
+    
+    # Check if the message contains specific language names
+    for language in language_indicators:
+        if language in message_lower:
+            best_section = 'languages'
+            best_score = 10  # High priority for language detection
+            break
+    
+    # If no specific language found, check other sections
+    if not best_section:
+        for section, config in section_patterns.items():
+            score = 0
+            for keyword in config['keywords']:
+                if keyword in message_lower:
+                    score += 1
+            
+            if score > best_score:
+                best_score = score
+                best_section = section
+    
+    # If no clear section found, try to infer from content
+    if not best_section or best_score == 0:
+        # Check for specific patterns that indicate sections
+        if any(word in message_lower for word in ['degree', 'university', 'graduated', 'bachelor', 'master', 'phd']):
+            best_section = 'education'
+        elif any(word in message_lower for word in ['worked', 'job', 'position', 'employed', 'internship']):
+            best_section = 'experience'
+        elif any(word in message_lower for word in ['python', 'javascript', 'react', 'java', 'sql']):
+            best_section = 'skills'
+        elif any(word in message_lower for word in ['project', 'built', 'developed', 'created']):
+            best_section = 'projects'
+        else:
+            best_section = 'additional'  # Default fallback
+    
+    # Extract content using the best section's patterns
+    extracted_content = ""
+    if best_section and best_section in section_patterns:
+        patterns = section_patterns[best_section]['patterns']
+        
+        for pattern in patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                extracted_content = match.group(1).strip()
+                # Clean up the extracted content
+                extracted_content = re.sub(r'^\s*(?:i\s+(?:have\s+)?|i\s+(?:am\s+)?)', '', extracted_content)
+                extracted_content = re.sub(r'\s+', ' ', extracted_content)
+                extracted_content = extracted_content.title()
+                break
+        
+        # If no pattern matched, use a cleaned version of the message
+        if not extracted_content:
+            # Remove common introductory phrases
+            cleaned = re.sub(r'^(?:i\s+(?:have\s+)?|i\s+(?:am\s+)?|my\s+|i\s+(?:worked|studied|built|developed|created|designed|implemented)\s+)', '', message_lower)
+            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            extracted_content = cleaned.title()
+    
+    return best_section, extracted_content
+
 def clean_duplicate_project_sections(cv_content: str) -> str:
     """Remove all project sections and additional sections"""
     lines = cv_content.split('\n')
@@ -3003,8 +3223,8 @@ async def chat(request: ChatRequest):
                              "OBJECTIVE_ADD", "CERTIFICATION_ADD", "RESEARCH_ADD", "ACHIEVEMENT_ADD", "LEADERSHIP_ADD", 
                              "VOLUNTEER_ADD", "LANGUAGE_ADD", "TECHNOLOGY_ADD", "INTEREST_ADD", "REFERENCE_ADD", "ADDITIONAL_ADD"]:
                 if cv_content:
-                    # Use intelligent content extraction to get main content and auto-detect section
-                    extracted_content, detected_section = extract_intelligent_content(request.message)
+                    # 🧠 Use Universal CV Section Extractor
+                    detected_section, extracted_content = extract_universal_cv_content(request.message)
                     
                     # Override detected section with explicit category if available
                     section_map = {
@@ -3028,24 +3248,24 @@ async def chat(request: ChatRequest):
                     }
                     section_type = section_map.get(category, detected_section)
                     
-                    print(f"[DIAG] Incoming {category}. Original message: {request.message}")
-                    print(f"[DIAG] Extracted content: {extracted_content}")
-                    print(f"[DIAG] Detected section: {detected_section}, Using section: {section_type}")
-                    print(f"[DIAG] CV before update (excerpt): {cv_content[cv_content.lower().find(section_type):][:500] if section_type in cv_content.lower() else cv_content[:500]}")
+                    print(f"🧠 Universal Extractor - Category: {category}")
+                    print(f"🧠 Original message: {request.message}")
+                    print(f"🧠 Detected section: {detected_section}")
+                    print(f"🧠 Using section: {section_type}")
+                    print(f"🧠 Extracted content: {extracted_content}")
                     
                     # Use the extracted content instead of the full message
                     updated_cv = insert_content_in_section_enhanced(cv_content, section_type, extracted_content, "append")
                     
-                    print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
                     if updated_cv != cv_content:
                         cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
                         cv_updated = True
-                        print(f"[DIAG] DB updated with new {section_type} section.")
+                        print(f"✅ Successfully added to {section_type} section")
                         # Extract and return the updated section
                         updated_section = extract_section_from_cv(updated_cv, section_type)
                         response_text = f"✅ Added '{extracted_content}' to {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
                     else:
-                        print(f"[DIAG] No changes made to {section_type} section.")
+                        print(f"⚠️ No changes made to {section_type} section")
                         response_text = f"⚠️ No changes made to your {section_type} section."
                     
                     if category == "PROJECT_ADD":
