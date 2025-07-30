@@ -1,58 +1,51 @@
 #!/usr/bin/env python3
 """
-Debug classification for failing cases
+Debug script to test classification logic directly.
 """
 
-import requests
-import json
+import re
 
-def test_specific_classifications():
-    """Test specific failing classifications"""
+def classify_message_fallback_debug(message: str, cv_content: str = None) -> dict:
+    """Debug version of classify_message_fallback"""
+    msg = message.lower()
+    print(f"[DEBUG] classify_message_fallback: message='{message}' (lower='{msg}')")
+
+    # SPECIFIC ADD OPERATIONS - Check these FIRST before any other patterns
+    print(f"[DEBUG] UPDATED CODE VERSION - Checking OBJECTIVE_ADD: add/insert/put/append in msg? {any(kw in msg for kw in ['add', 'include', 'insert', 'put', 'append'])}, objective/goal in msg? {any(kw in msg for kw in ['objective', 'goal', 'career objective', 'professional objective'])}")
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD")
+        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
-    base_url = "http://localhost:8081"
+    # IMPLICIT ADD OPERATIONS - For messages without explicit "add" words
+    if ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg or "aim" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD (implicit)")
+        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
-    # Test the specific failing messages
-    failing_messages = [
-        "Add my objective: To become a senior software engineer in a leading tech company",
-        "Add my interest: Playing guitar, mountain biking", 
-        "Add additional info: Available for remote work",
-        "Update my objective to focus on AI development",
-        "Change my certification to include AWS Solutions Architect",
-        "Modify my research to include blockchain applications",
-        "Update my achievement to include Best Developer Award",
-        "Change my leadership role to Senior Team Lead",
-        "Update my volunteer work to include disaster relief",
-        "Change my interests to include rock climbing",
-        "Update my references to include current manager",
-        "Modify additional info to include travel availability"
+    # If no specific pattern matches, return help
+    print("[DEBUG] classify_message_fallback: No pattern matched, returning CV_HELP")
+    return {"category": "CV_HELP", "extracted_info": message.strip(), "operation": "READ"}
+
+def test_classification():
+    """Test classification with objective messages"""
+    test_messages = [
+        "My career objective is to become a senior software engineer",
+        "I aim to lead development teams and deliver innovative solutions"
     ]
     
-    print("🔍 Debugging Classification Issues")
+    print("🧪 Testing Classification Logic")
     print("=" * 50)
     
-    for i, message in enumerate(failing_messages, 1):
-        print(f"\n{i}. Testing: {message}")
+    for i, message in enumerate(test_messages, 1):
+        print(f"\n📋 Test {i}: '{message}'")
+        print("-" * 40)
         
-        try:
-            response = requests.post(f"{base_url}/chat/", json={"message": message})
-            
-            if response.status_code == 200:
-                result = response.json()
-                response_text = result.get("response", "")
-                
-                if "👋 I'm your AI CV Assistant" in response_text:
-                    print(f"   ❌ FAILED - Falling back to help message")
-                    print(f"   Response: {response_text[:100]}...")
-                elif "✅ Added" in response_text or "✅ Updated" in response_text:
-                    print(f"   ✅ SUCCESS - Operation completed")
-                else:
-                    print(f"   ⚠️ PARTIAL - Unexpected response")
-                    print(f"   Response: {response_text[:100]}...")
-            else:
-                print(f"   ❌ ERROR - Status code: {response.status_code}")
-                
-        except Exception as e:
-            print(f"   ❌ EXCEPTION: {e}")
+        result = classify_message_fallback_debug(message)
+        print(f"Result: {result}")
+        
+        if result.get("category") == "OBJECTIVE_ADD":
+            print("✅ PASS - Correctly classified as OBJECTIVE_ADD")
+        else:
+            print(f"❌ FAIL - Expected OBJECTIVE_ADD, got {result.get('category')}")
 
 if __name__ == "__main__":
-    test_specific_classifications() 
+    test_classification() 

@@ -1066,14 +1066,14 @@ function ProjectManagementPage() {
                 >
                   📄 Preview CV
                 </Button>
-                <Button
-                  theme={theme}
-                  variant="primary"
-                  onClick={handleDownloadCVWithSelectedProjects}
-                  disabled={selectedProjects.length === 0}
-                >
+              <Button
+                theme={theme}
+                variant="primary"
+                onClick={handleDownloadCVWithSelectedProjects}
+                disabled={selectedProjects.length === 0}
+              >
                   📥 Download CV
-                </Button>
+              </Button>
               </div>
             </ProjectsContainer>
 

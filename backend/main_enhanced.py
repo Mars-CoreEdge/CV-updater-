@@ -1051,6 +1051,17 @@ EXPERIENCE_ADD: adding work experience ("I worked", "I was employed", "job at", 
 EDUCATION_ADD: adding education ("I studied", "graduated from", "degree in", "certification in")
 PROJECT_ADD: adding new project ("I built", "I created", "I developed", "project called")
 CONTACT_ADD: adding contact info ("my email is", "phone number", "linkedin", "address")
+OBJECTIVE_ADD: adding career objective ("my objective", "career goal", "aim to", "professional objective")
+CERTIFICATION_ADD: adding certifications ("certified", "license", "credential", "training")
+RESEARCH_ADD: adding research ("research paper", "publication", "study", "thesis")
+ACHIEVEMENT_ADD: adding achievements ("award", "recognition", "honor", "accomplishment")
+LEADERSHIP_ADD: adding leadership ("led team", "managed", "supervised", "directed")
+VOLUNTEER_ADD: adding volunteer work ("volunteered", "community service", "charity")
+LANGUAGE_ADD: adding languages ("speak", "fluent in", "language", "bilingual")
+TECHNOLOGY_ADD: adding technologies ("tool", "software", "platform", "system")
+INTEREST_ADD: adding interests ("hobby", "interest", "enjoy", "passion")
+REFERENCE_ADD: adding references ("reference", "recommendation", "endorsement")
+ADDITIONAL_ADD: adding additional info ("additional", "miscellaneous", "other")
 
 === READ OPERATIONS ===
 CV_SHOW: show full CV ("show cv", "display cv", "my cv", "current cv")
@@ -1059,6 +1070,17 @@ EXPERIENCE_SHOW: show experience ("what experience", "my jobs", "work history", 
 EDUCATION_SHOW: show education ("my education", "degrees", "qualifications", "academic")
 PROJECT_SHOW: show projects ("my projects", "what projects", "list projects", "portfolio")
 CONTACT_SHOW: show contact info ("my contact", "contact details", "how to reach")
+OBJECTIVE_SHOW: show objective ("my objective", "career goal", "show objective")
+CERTIFICATION_SHOW: show certifications ("my certifications", "show certifications", "list certifications")
+RESEARCH_SHOW: show research ("my research", "show research", "list research")
+ACHIEVEMENT_SHOW: show achievements ("my achievements", "show achievements", "list achievements")
+LEADERSHIP_SHOW: show leadership ("my leadership", "show leadership", "list leadership")
+VOLUNTEER_SHOW: show volunteer work ("my volunteer", "show volunteer", "list volunteer")
+LANGUAGE_SHOW: show languages ("my languages", "show languages", "list languages")
+TECHNOLOGY_SHOW: show technologies ("my technologies", "show technologies", "list technologies")
+INTEREST_SHOW: show interests ("my interests", "show interests", "list interests")
+REFERENCE_SHOW: show references ("my references", "show references", "list references")
+ADDITIONAL_SHOW: show additional info ("my additional", "show additional", "list additional")
 
 === UPDATE OPERATIONS ===
 SKILL_UPDATE: modify existing skills ("update skill", "change skill", "modify skill")
@@ -1066,6 +1088,17 @@ EXPERIENCE_UPDATE: modify work experience ("update job", "change experience", "m
 EDUCATION_UPDATE: modify education ("update degree", "change education", "modify qualification")
 PROJECT_UPDATE: modify project ("update project", "change project", "modify project")
 CONTACT_UPDATE: modify contact info ("update contact", "change email", "new phone")
+OBJECTIVE_UPDATE: modify objective ("update objective", "change objective", "modify objective")
+CERTIFICATION_UPDATE: modify certifications ("update certification", "change certification", "modify certification")
+RESEARCH_UPDATE: modify research ("update research", "change research", "modify research")
+ACHIEVEMENT_UPDATE: modify achievements ("update achievement", "change achievement", "modify achievement")
+LEADERSHIP_UPDATE: modify leadership ("update leadership", "change leadership", "modify leadership")
+VOLUNTEER_UPDATE: modify volunteer work ("update volunteer", "change volunteer", "modify volunteer")
+LANGUAGE_UPDATE: modify languages ("update language", "change language", "modify language")
+TECHNOLOGY_UPDATE: modify technologies ("update technology", "change technology", "modify technology")
+INTEREST_UPDATE: modify interests ("update interest", "change interest", "modify interest")
+REFERENCE_UPDATE: modify references ("update reference", "change reference", "modify reference")
+ADDITIONAL_UPDATE: modify additional info ("update additional", "change additional", "modify additional")
 
 === DELETE OPERATIONS ===
 SKILL_DELETE: remove skills ("remove skill", "delete skill", "don't have skill")
@@ -1073,6 +1106,17 @@ EXPERIENCE_DELETE: remove experience ("remove job", "delete experience", "wasn't
 EDUCATION_DELETE: remove education ("remove degree", "delete education", "didn't study")
 PROJECT_DELETE: remove project ("remove project", "delete project", "didn't build")
 CONTACT_DELETE: remove contact info ("remove contact", "delete email", "no phone")
+OBJECTIVE_DELETE: remove objective ("remove objective", "delete objective", "no objective")
+CERTIFICATION_DELETE: remove certifications ("remove certification", "delete certification", "no certification")
+RESEARCH_DELETE: remove research ("remove research", "delete research", "no research")
+ACHIEVEMENT_DELETE: remove achievements ("remove achievement", "delete achievement", "no achievement")
+LEADERSHIP_DELETE: remove leadership ("remove leadership", "delete leadership", "no leadership")
+VOLUNTEER_DELETE: remove volunteer work ("remove volunteer", "delete volunteer", "no volunteer")
+LANGUAGE_DELETE: remove languages ("remove language", "delete language", "no language")
+TECHNOLOGY_DELETE: remove technologies ("remove technology", "delete technology", "no technology")
+INTEREST_DELETE: remove interests ("remove interest", "delete interest", "no interest")
+REFERENCE_DELETE: remove references ("remove reference", "delete reference", "no reference")
+ADDITIONAL_DELETE: remove additional info ("remove additional", "delete additional", "no additional")
 
 === UTILITY OPERATIONS ===
 CV_GENERATE: generate updated CV ("generate cv", "create cv", "make cv", "build cv")
@@ -1118,6 +1162,21 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
     if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("hobby" in msg or "interest" in msg or "passion" in msg or "enjoy" in msg or "like to" in msg):
         print("[DEBUG] classify_message_fallback: Detected INTEREST_ADD")
         return {"category": "INTEREST_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("certification" in msg or "certified" in msg or "license" in msg or "credential" in msg or "training" in msg):
+        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_ADD")
+        return {"category": "CERTIFICATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("research" in msg or "publication" in msg or "paper" in msg or "thesis" in msg or "dissertation" in msg or "study" in msg):
+        print("[DEBUG] classify_message_fallback: Detected RESEARCH_ADD")
+        return {"category": "RESEARCH_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("award" in msg or "honor" in msg or "achievement" in msg or "recognition" in msg or "scholarship" in msg):
+        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_ADD")
+        return {"category": "ACHIEVEMENT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("leadership" in msg or "led" in msg or "managed" in msg or "supervised" in msg or "directed" in msg):
+        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_ADD")
+        return {"category": "LEADERSHIP_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if any(kw in msg for kw in ["add", "include", "insert", "put", "append"]) and ("tool" in msg or "technology" in msg or "technologies" in msg or "software" in msg or "platform" in msg or "system" in msg):
+        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_ADD")
+        return {"category": "TECHNOLOGY_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
 
     # UTILITY OPERATIONS - Check these AFTER specific ADD patterns
     elif any(phrase in msg for phrase in ["linkedin blog", "linkedin post", "generate linkedin", "create linkedin", "write linkedin"]):
@@ -1158,6 +1217,42 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
     elif any(phrase in msg for phrase in ["create linkedin blog", "generate blog", "write blog", "linkedin post"]):
         print("[DEBUG] classify_message_fallback: Detected LINKEDIN_BLOG")
         return {"category": "LINKEDIN_BLOG", "extracted_info": message.strip(), "operation": "CREATE"}
+    
+    # IMPLICIT ADD OPERATIONS - For messages without explicit "add" words
+    # These are treated as CREATE operations when specific section keywords are detected
+    if ("objective" in msg or "goal" in msg or "career objective" in msg or "professional objective" in msg or "aim" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected OBJECTIVE_ADD (implicit)")
+        return {"category": "OBJECTIVE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("certification" in msg or "certified" in msg or "license" in msg or "credential" in msg or "training" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected CERTIFICATION_ADD (implicit)")
+        return {"category": "CERTIFICATION_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("research" in msg or "publication" in msg or "paper" in msg or "thesis" in msg or "dissertation" in msg or "study" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected RESEARCH_ADD (implicit)")
+        return {"category": "RESEARCH_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("award" in msg or "honor" in msg or "achievement" in msg or "recognition" in msg or "scholarship" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected ACHIEVEMENT_ADD (implicit)")
+        return {"category": "ACHIEVEMENT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("leadership" in msg or "led" in msg or "managed" in msg or "supervised" in msg or "directed" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected LEADERSHIP_ADD (implicit)")
+        return {"category": "LEADERSHIP_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("volunteer" in msg or "community service" in msg or "charity" in msg or "pro bono" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected VOLUNTEER_ADD (implicit)")
+        return {"category": "VOLUNTEER_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("language" in msg or "speak" in msg or "fluent in" in msg or "proficient in" in msg or any(lang in msg for lang in ["chinese", "english", "spanish", "french", "german", "italian", "portuguese", "russian", "japanese", "korean", "arabic", "hindi", "urdu"])) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected LANGUAGE_ADD (implicit)")
+        return {"category": "LANGUAGE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("tool" in msg or "software" in msg or "platform" in msg or "system" in msg or "git" in msg or "proficient with" in msg or "skilled in" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected TECHNOLOGY_ADD (implicit)")
+        return {"category": "TECHNOLOGY_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("hobby" in msg or "interest" in msg or "passion" in msg or "enjoy" in msg or "like to" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected INTEREST_ADD (implicit)")
+        return {"category": "INTEREST_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("reference" in msg or "referee" in msg or "recommendation" in msg or "endorsement" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected REFERENCE_ADD (implicit)")
+        return {"category": "REFERENCE_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
+    if ("additional" in msg or "miscellaneous" in msg or "other" in msg or "extra" in msg) and not any(kw in msg for kw in ["show", "display", "list", "what", "update", "change", "modify", "delete", "remove"]):
+        print("[DEBUG] classify_message_fallback: Detected ADDITIONAL_ADD (implicit)")
+        return {"category": "ADDITIONAL_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
     # EDUCATION ADD/UPDATE - expanded patterns
     education_add_phrases = [
@@ -1764,6 +1859,947 @@ def extract_education_fallback(message: str) -> str:
     else:
         return f"{degree_type} of {field} {status}, from {university}"
 
+# ===== SECTION EXTRACTION FUNCTIONS =====
+
+def extract_objective_from_message(message: str) -> str:
+    """Extract and format objective from chat message"""
+    try:
+        prompt = f"""Extract career objective information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the objective as a clear, professional career goal statement.
+        
+        Examples:
+        - "To become a senior software engineer and lead development teams"
+        - "To leverage my technical skills in a challenging software development role"
+        - "To contribute to innovative projects as a full-stack developer"
+        
+        Extract and format only the objective, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_objective_fallback(message)
+
+def extract_objective_fallback(message: str) -> str:
+    """Fallback method to extract and format objective"""
+    msg_lower = message.lower()
+    
+    # Remove common prefixes
+    prefixes_to_remove = [
+        "my career objective is", "my objective is", "my goal is", "i aim to", "i want to",
+        "career objective:", "objective:", "goal:", "aim:", "target:"
+    ]
+    
+    content = message.strip()
+    for prefix in prefixes_to_remove:
+        if content.lower().startswith(prefix):
+            content = content[len(prefix):].strip()
+            break
+    
+    # If content is too short, return original
+    if len(content) < 10:
+        return message.strip()
+    
+    return content
+
+def extract_certification_from_message(message: str) -> str:
+    """Extract and format certification from chat message"""
+    try:
+        prompt = f"""Extract certification information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the certification as: "[Certification Name] - [Issuing Organization] [Year/Status]"
+        
+        Examples:
+        - "AWS Certified Solutions Architect - Amazon Web Services 2023"
+        - "Microsoft Azure Developer - Microsoft 2022"
+        - "Google Cloud Professional - Google Cloud Platform 2024"
+        
+        Extract and format only the certification, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_certification_fallback(message)
+
+def extract_certification_fallback(message: str) -> str:
+    """Fallback method to extract and format certification"""
+    msg_lower = message.lower()
+    
+    # Extract certification name
+    cert_patterns = [
+        r'aws\s+certified\s+([^,\.]+)',
+        r'microsoft\s+([^,\.]+)\s+certification',
+        r'google\s+cloud\s+([^,\.]+)',
+        r'([^,\.]+)\s+certification',
+        r'certified\s+([^,\.]+)',
+        r'([^,\.]+)\s+certified'
+    ]
+    
+    cert_name = ""
+    for pattern in cert_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            cert_name = match.group(1).strip().title()
+            break
+    
+    # Extract organization
+    org_patterns = [
+        r'from\s+([^,\.]+)',
+        r'by\s+([^,\.]+)',
+        r'([^,\.]+)\s+certification',
+        r'aws|amazon|microsoft|google|cisco|oracle'
+    ]
+    
+    organization = "Professional Organization"
+    for pattern in org_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            org = match.group(1).strip().title()
+            if org.lower() in ['aws', 'amazon']:
+                organization = "Amazon Web Services"
+            elif org.lower() == 'microsoft':
+                organization = "Microsoft"
+            elif org.lower() == 'google':
+                organization = "Google Cloud Platform"
+            else:
+                organization = org
+            break
+    
+    # Extract year
+    year_match = re.search(r'(\d{4})', message)
+    year = year_match.group(1) if year_match else "2024"
+    
+    if not cert_name:
+        return message.strip()
+    
+    return f"{cert_name} - {organization} {year}"
+
+def extract_research_from_message(message: str) -> str:
+    """Extract and format research from chat message"""
+    try:
+        prompt = f"""Extract research information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the research as: "[Research Title/Type] - [Institution/Journal] [Year]"
+        
+        Examples:
+        - "Machine Learning Ethics - Stanford University 2023"
+        - "Blockchain Technology Study - MIT 2022"
+        - "AI Research Paper - IEEE Conference 2024"
+        
+        Extract and format only the research, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_research_fallback(message)
+
+def extract_research_fallback(message: str) -> str:
+    """Fallback method to extract and format research"""
+    msg_lower = message.lower()
+    
+    # Extract research type/title
+    research_patterns = [
+        r'research\s+(?:on|about|paper\s+on)\s+([^,\.]+)',
+        r'study\s+(?:on|about)\s+([^,\.]+)',
+        r'paper\s+(?:on|about)\s+([^,\.]+)',
+        r'([^,\.]+)\s+research',
+        r'([^,\.]+)\s+study'
+    ]
+    
+    research_topic = ""
+    for pattern in research_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            research_topic = match.group(1).strip().title()
+            break
+    
+    # Extract institution/journal
+    inst_patterns = [
+        r'at\s+([^,\.]+)',
+        r'from\s+([^,\.]+)',
+        r'([^,\.]+)\s+university',
+        r'([^,\.]+)\s+journal',
+        r'([^,\.]+)\s+conference'
+    ]
+    
+    institution = "Academic Institution"
+    for pattern in inst_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            institution = match.group(1).strip().title()
+            break
+    
+    # Extract year
+    year_match = re.search(r'(\d{4})', message)
+    year = year_match.group(1) if year_match else "2024"
+    
+    if not research_topic:
+        return message.strip()
+    
+    return f"{research_topic} Research - {institution} {year}"
+
+def extract_achievement_from_message(message: str) -> str:
+    """Extract and format achievement from chat message"""
+    try:
+        prompt = f"""Extract achievement information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the achievement as: "[Achievement Name] - [Organization/Event] [Year]"
+        
+        Examples:
+        - "Best Developer Award - Tech Conference 2023"
+        - "Hackathon Winner - University Competition 2022"
+        - "Outstanding Performance - Company Recognition 2024"
+        
+        Extract and format only the achievement, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_achievement_fallback(message)
+
+def extract_achievement_fallback(message: str) -> str:
+    """Fallback method to extract and format achievement"""
+    msg_lower = message.lower()
+    
+    # Extract achievement type
+    achievement_patterns = [
+        r'received\s+([^,\.]+)',
+        r'won\s+([^,\.]+)',
+        r'earned\s+([^,\.]+)',
+        r'([^,\.]+)\s+award',
+        r'([^,\.]+)\s+recognition',
+        r'([^,\.]+)\s+honor'
+    ]
+    
+    achievement = ""
+    for pattern in achievement_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            achievement = match.group(1).strip().title()
+            break
+    
+    # Extract organization/event
+    org_patterns = [
+        r'from\s+([^,\.]+)',
+        r'at\s+([^,\.]+)',
+        r'([^,\.]+)\s+conference',
+        r'([^,\.]+)\s+competition',
+        r'([^,\.]+)\s+university'
+    ]
+    
+    organization = "Organization"
+    for pattern in org_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            organization = match.group(1).strip().title()
+            break
+    
+    # Extract year
+    year_match = re.search(r'(\d{4})', message)
+    year = year_match.group(1) if year_match else "2024"
+    
+    if not achievement:
+        return message.strip()
+    
+    return f"{achievement} - {organization} {year}"
+
+def extract_leadership_from_message(message: str) -> str:
+    """Extract and format leadership from chat message"""
+    try:
+        prompt = f"""Extract leadership information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the leadership as: "[Role/Responsibility] - [Organization/Team] [Duration]"
+        
+        Examples:
+        - "Team Lead - Software Development Team 2022-2023"
+        - "Project Manager - Agile Development Team 6 months"
+        - "Technical Lead - Engineering Department 2023-2024"
+        
+        Extract and format only the leadership, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_leadership_fallback(message)
+
+def extract_leadership_fallback(message: str) -> str:
+    """Fallback method to extract and format leadership"""
+    msg_lower = message.lower()
+    
+    # Extract role
+    role_patterns = [
+        r'led\s+([^,\.]+)',
+        r'managed\s+([^,\.]+)',
+        r'supervised\s+([^,\.]+)',
+        r'team\s+lead\s+([^,\.]+)',
+        r'([^,\.]+)\s+lead',
+        r'([^,\.]+)\s+manager'
+    ]
+    
+    role = ""
+    for pattern in role_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            role = match.group(1).strip().title()
+            break
+    
+    # Extract team/organization
+    team_patterns = [
+        r'team\s+of\s+([^,\.]+)',
+        r'([^,\.]+)\s+team',
+        r'([^,\.]+)\s+department',
+        r'([^,\.]+)\s+group'
+    ]
+    
+    team = "Team"
+    for pattern in team_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            team = match.group(1).strip().title()
+            break
+    
+    # Extract duration
+    duration_patterns = [
+        r'for\s+([^,\.]+)',
+        r'([^,\.]+)\s+months',
+        r'([^,\.]+)\s+years',
+        r'(\d{4}-\d{4})'
+    ]
+    
+    duration = "2023-2024"
+    for pattern in duration_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            duration = match.group(1).strip()
+            break
+    
+    if not role:
+        return message.strip()
+    
+    return f"{role} - {team} {duration}"
+
+def extract_volunteer_from_message(message: str) -> str:
+    """Extract and format volunteer work from chat message"""
+    try:
+        prompt = f"""Extract volunteer work information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the volunteer work as: "[Role/Activity] - [Organization] [Duration]"
+        
+        Examples:
+        - "Coding Instructor - Local Bootcamp 2023-2024"
+        - "Community Service - Charity Organization 6 months"
+        - "Mentor - Youth Program 2022-2023"
+        
+        Extract and format only the volunteer work, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_volunteer_fallback(message)
+
+def extract_volunteer_fallback(message: str) -> str:
+    """Fallback method to extract and format volunteer work"""
+    msg_lower = message.lower()
+    
+    # Extract activity
+    activity_patterns = [
+        r'volunteered\s+([^,\.]+)',
+        r'community\s+service\s+([^,\.]+)',
+        r'mentored\s+([^,\.]+)',
+        r'([^,\.]+)\s+volunteer',
+        r'([^,\.]+)\s+mentor'
+    ]
+    
+    activity = ""
+    for pattern in activity_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            activity = match.group(1).strip().title()
+            break
+    
+    # Extract organization
+    org_patterns = [
+        r'at\s+([^,\.]+)',
+        r'for\s+([^,\.]+)',
+        r'([^,\.]+)\s+organization',
+        r'([^,\.]+)\s+program',
+        r'([^,\.]+)\s+bootcamp'
+    ]
+    
+    organization = "Community Organization"
+    for pattern in org_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            organization = match.group(1).strip().title()
+            break
+    
+    # Extract duration
+    duration_patterns = [
+        r'for\s+([^,\.]+)',
+        r'([^,\.]+)\s+months',
+        r'([^,\.]+)\s+years',
+        r'(\d{4}-\d{4})'
+    ]
+    
+    duration = "2023-2024"
+    for pattern in duration_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            duration = match.group(1).strip()
+            break
+    
+    if not activity:
+        return message.strip()
+    
+    return f"{activity} - {organization} {duration}"
+
+def extract_language_from_message(message: str) -> str:
+    """Extract and format language skills from chat message"""
+    try:
+        prompt = f"""Extract language skills information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the language skills as: "[Language] - [Proficiency Level]"
+        
+        Examples:
+        - "English - Native"
+        - "Spanish - Fluent"
+        - "French - Conversational"
+        - "German - Intermediate"
+        
+        Extract and format only the language skills, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_language_fallback(message)
+
+def extract_language_fallback(message: str) -> str:
+    """Fallback method to extract and format language skills"""
+    msg_lower = message.lower()
+    
+    # Extract languages
+    language_patterns = [
+        r'speak\s+([^,\.]+)',
+        r'fluent\s+in\s+([^,\.]+)',
+        r'proficient\s+in\s+([^,\.]+)',
+        r'([^,\.]+)\s+language',
+        r'([^,\.]+)\s+speaker'
+    ]
+    
+    languages = []
+    for pattern in language_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            lang = match.group(1).strip().title()
+            if lang not in languages:
+                languages.append(lang)
+    
+    # Extract proficiency
+    proficiency_patterns = [
+        r'native\s+speaker',
+        r'fluent',
+        r'proficient',
+        r'conversational',
+        r'intermediate',
+        r'basic'
+    ]
+    
+    proficiency = "Proficient"
+    for pattern in proficiency_patterns:
+        if re.search(pattern, msg_lower):
+            proficiency = pattern.title()
+            break
+    
+    if not languages:
+        return message.strip()
+    
+    if len(languages) == 1:
+        return f"{languages[0]} - {proficiency}"
+    else:
+        return f"{', '.join(languages)} - {proficiency}"
+
+def extract_technology_from_message(message: str) -> str:
+    """Extract and format technology/tools from chat message"""
+    try:
+        prompt = f"""Extract technology/tools information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the technology as: "[Technology Category] - [Tools/Platforms]"
+        
+        Examples:
+        - "Development Tools - Git, Docker, Jenkins"
+        - "Project Management - Jira, Confluence, Slack"
+        - "Cloud Platforms - AWS, Azure, GCP"
+        
+        Extract and format only the technology, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_technology_fallback(message)
+
+def extract_technology_fallback(message: str) -> str:
+    """Fallback method to extract and format technology/tools"""
+    msg_lower = message.lower()
+    
+    # Extract tools/technologies
+    tool_patterns = [
+        r'proficient\s+with\s+([^,\.]+)',
+        r'skilled\s+in\s+([^,\.]+)',
+        r'([^,\.]+)\s+tools',
+        r'([^,\.]+)\s+software',
+        r'([^,\.]+)\s+platform'
+    ]
+    
+    tools = []
+    for pattern in tool_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            tool = match.group(1).strip().title()
+            if tool not in tools:
+                tools.append(tool)
+    
+    # Extract category
+    category_patterns = [
+        r'development\s+tools',
+        r'project\s+management',
+        r'cloud\s+platforms',
+        r'version\s+control',
+        r'collaboration\s+tools'
+    ]
+    
+    category = "Technology Tools"
+    for pattern in category_patterns:
+        if re.search(pattern, msg_lower):
+            category = pattern.title()
+            break
+    
+    if not tools:
+        return message.strip()
+    
+    return f"{category} - {', '.join(tools)}"
+
+def extract_interest_from_message(message: str) -> str:
+    """Extract and format interests/hobbies from chat message"""
+    try:
+        prompt = f"""Extract interests/hobbies information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the interests as: "[Interest Category] - [Activities/Hobbies]"
+        
+        Examples:
+        - "Technical Interests - Coding, Reading Tech Blogs"
+        - "Outdoor Activities - Hiking, Photography"
+        - "Creative Hobbies - Playing Guitar, Painting"
+        
+        Extract and format only the interests, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_interest_fallback(message)
+
+def extract_interest_fallback(message: str) -> str:
+    """Fallback method to extract and format interests/hobbies"""
+    msg_lower = message.lower()
+    
+    # Extract hobbies/interests
+    hobby_patterns = [
+        r'hobbies?\s*:\s*([^,\.]+)',
+        r'enjoy\s+([^,\.]+)',
+        r'like\s+([^,\.]+)',
+        r'passionate\s+about\s+([^,\.]+)',
+        r'love\s+([^,\.]+)'
+    ]
+    
+    hobbies = []
+    for pattern in hobby_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            hobby = match.group(1).strip().title()
+            if hobby not in hobbies:
+                hobbies.append(hobby)
+    
+    # Extract category
+    category_patterns = [
+        r'technical\s+interests',
+        r'outdoor\s+activities',
+        r'creative\s+hobbies',
+        r'sports',
+        r'music'
+    ]
+    
+    category = "Personal Interests"
+    for pattern in category_patterns:
+        if re.search(pattern, msg_lower):
+            category = pattern.title()
+            break
+    
+    if not hobbies:
+        return message.strip()
+    
+    return f"{category} - {', '.join(hobbies)}"
+
+def extract_reference_from_message(message: str) -> str:
+    """Extract and format references from chat message"""
+    try:
+        prompt = f"""Extract reference information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the references as: "[Reference Type] - [Availability/Details]"
+        
+        Examples:
+        - "Professional References - Available upon request"
+        - "Academic References - From University Professors"
+        - "Industry References - From Previous Employers"
+        
+        Extract and format only the references, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_reference_fallback(message)
+
+def extract_reference_fallback(message: str) -> str:
+    """Fallback method to extract and format references"""
+    msg_lower = message.lower()
+    
+    # Extract reference type
+    ref_patterns = [
+        r'professional\s+references',
+        r'academic\s+references',
+        r'industry\s+references',
+        r'work\s+references',
+        r'personal\s+references'
+    ]
+    
+    ref_type = "Professional References"
+    for pattern in ref_patterns:
+        if re.search(pattern, msg_lower):
+            ref_type = pattern.title()
+            break
+    
+    # Extract availability
+    availability_patterns = [
+        r'available\s+upon\s+request',
+        r'upon\s+request',
+        r'provided\s+upon\s+request',
+        r'can\s+provide'
+    ]
+    
+    availability = "Available upon request"
+    for pattern in availability_patterns:
+        if re.search(pattern, msg_lower):
+            availability = "Available upon request"
+            break
+    
+    return f"{ref_type} - {availability}"
+
+def extract_additional_from_message(message: str) -> str:
+    """Extract and format additional information from chat message"""
+    try:
+        prompt = f"""Extract additional information from this message and format it properly:
+        
+        Message: {message}
+        
+        Format the additional information as: "[Category] - [Details]"
+        
+        Examples:
+        - "Work Authorization - US Citizen"
+        - "Open Source - Active Contributor"
+        - "Professional Memberships - IEEE Member"
+        
+        Extract and format only the additional information, no bullet points or extra text."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content.strip()
+        return result
+    except:
+        # Fallback pattern extraction
+        return extract_additional_fallback(message)
+
+def extract_additional_fallback(message: str) -> str:
+    """Fallback method to extract and format additional information"""
+    msg_lower = message.lower()
+    
+    # Extract category
+    category_patterns = [
+        r'work\s+authorization',
+        r'open\s+source',
+        r'professional\s+memberships',
+        r'volunteer\s+work',
+        r'certifications',
+        r'publications'
+    ]
+    
+    category = "Additional Information"
+    for pattern in category_patterns:
+        if re.search(pattern, msg_lower):
+            category = pattern.title()
+            break
+    
+    # Extract details
+    details_patterns = [
+        r'([^,\.]+)\s+authorization',
+        r'([^,\.]+)\s+contributor',
+        r'([^,\.]+)\s+member',
+        r'([^,\.]+)\s+citizen'
+    ]
+    
+    details = "Details available"
+    for pattern in details_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            details = match.group(1).strip().title()
+            break
+    
+    return f"{category} - {details}"
+
+# ===== SECTION DETECTION FUNCTIONS =====
+
+def get_objective_section(cv_content: str) -> str:
+    """
+    Extract the objective/career goal section from CV content.
+    Uses smart regex patterns to detect various objective section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "objective")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_certifications_section(cv_content: str) -> str:
+    """
+    Extract the certifications section from CV content.
+    Uses smart regex patterns to detect various certification section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "certifications")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_research_section(cv_content: str) -> str:
+    """
+    Extract the research section from CV content.
+    Uses smart regex patterns to detect various research section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "research")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_achievements_section(cv_content: str) -> str:
+    """
+    Extract the achievements section from CV content.
+    Uses smart regex patterns to detect various achievement section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "achievements")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_leadership_section(cv_content: str) -> str:
+    """
+    Extract the leadership section from CV content.
+    Uses smart regex patterns to detect various leadership section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "leadership")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_volunteer_section(cv_content: str) -> str:
+    """
+    Extract the volunteer section from CV content.
+    Uses smart regex patterns to detect various volunteer section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "volunteer")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_languages_section(cv_content: str) -> str:
+    """
+    Extract the languages section from CV content.
+    Uses smart regex patterns to detect various language section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "languages")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_technologies_section(cv_content: str) -> str:
+    """
+    Extract the technologies section from CV content.
+    Uses smart regex patterns to detect various technology section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "technologies")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_interests_section(cv_content: str) -> str:
+    """
+    Extract the interests section from CV content.
+    Uses smart regex patterns to detect various interest section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "interests")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
+def get_additional_section(cv_content: str) -> str:
+    """
+    Extract the additional information section from CV content.
+    Uses smart regex patterns to detect various additional section headers.
+    """
+    section_info = find_section_in_cv(cv_content, "additional")
+    if section_info and section_info.get('found'):
+        # Remove the header line and return only the content
+        content_lines = section_info['content'].split('\n')
+        if len(content_lines) > 1:
+            return '\n'.join(content_lines[1:]).strip()
+        return section_info['content'].strip()
+    return ""
+
 # ===== NEW CRUD HELPER FUNCTIONS =====
 
 def extract_intelligent_content(message: str) -> tuple[str, str]:
@@ -1775,15 +2811,22 @@ def extract_intelligent_content(message: str) -> tuple[str, str]:
     
     # Auto-detect section based on keywords and patterns
     section_keywords = {
-        "skills": ["skill", "technology", "programming", "language", "framework", "tool", "software", "expertise", "proficient", "know", "learned", "mastered"],
+        "skills": ["skill", "programming", "language", "framework", "expertise", "know", "learned", "mastered"],
         "experience": ["experience", "work", "job", "employment", "position", "role", "responsibility", "led", "managed", "developed", "built", "created", "implemented"],
         "education": ["education", "degree", "university", "college", "school", "graduated", "studied", "certification", "course", "diploma", "masters", "bachelors", "phd"],
-        "projects": ["project", "built", "created", "developed", "application", "website", "app", "system", "platform", "tool", "software"],
+        "projects": ["project", "built", "created", "developed", "application", "website", "app", "system", "platform"],
         "contact": ["contact", "phone", "email", "linkedin", "address", "location", "portfolio", "website"],
-        "profile": ["profile", "summary", "about", "objective", "introduction", "background", "overview"],
-        "achievements": ["achievement", "award", "recognition", "honor", "accomplishment", "success", "milestone"],
-        "languages": ["language", "speak", "fluent", "conversational", "native", "bilingual"],
-        "interests": ["interest", "hobby", "passion", "enjoy", "like", "love", "favorite"]
+        "objective": ["objective", "goal", "career objective", "professional objective", "aim", "target"],
+        "certifications": ["certification", "certified", "license", "credential", "training", "certificate"],
+        "research": ["research", "publication", "paper", "thesis", "dissertation", "study", "academic"],
+        "achievements": ["achievement", "award", "recognition", "honor", "accomplishment", "success", "milestone", "scholarship"],
+        "leadership": ["leadership", "led", "managed", "supervised", "directed", "team lead", "manager"],
+        "volunteer": ["volunteer", "community service", "charity", "pro bono", "community work"],
+        "languages": ["language", "speak", "fluent", "conversational", "native", "bilingual", "proficient in"],
+        "technologies": ["tool", "software", "platform", "system", "technology", "technologies", "git", "docker", "jenkins", "jira", "confluence", "slack", "proficient with", "skilled in"],
+        "interests": ["interest", "hobby", "passion", "enjoy", "like", "love", "favorite"],
+        "references": ["reference", "referee", "recommendation", "endorsement"],
+        "additional": ["additional", "miscellaneous", "other", "extra"]
     }
     
     # Count keyword matches for each section
@@ -2105,7 +3148,18 @@ def read_cv_section(cv_content: str, section_type: str) -> str:
                 'experience': ['work', 'job', 'position', 'company', 'role', 'responsibilities', 'employed'],
                 'education': ['education', 'degree', 'university', 'college', 'school', 'certification', 'course'],
                 'projects': ['project', 'built', 'developed', 'created', 'app', 'website', 'system'],
-                'contact': ['email', 'phone', 'linkedin', 'address', 'contact']
+                'contact': ['email', 'phone', 'linkedin', 'address', 'contact'],
+                'objective': ['objective', 'goal', 'career objective', 'professional objective'],
+                'certifications': ['certification', 'certified', 'license', 'credential', 'training'],
+                'research': ['research', 'publication', 'paper', 'thesis', 'dissertation', 'study'],
+                'achievements': ['achievement', 'award', 'honor', 'recognition', 'scholarship'],
+                'leadership': ['leadership', 'led', 'managed', 'supervised', 'directed'],
+                'volunteer': ['volunteer', 'community', 'charity', 'service', 'pro bono'],
+                'languages': ['language', 'speak', 'fluent', 'proficient', 'bilingual'],
+                'technologies': ['tool', 'software', 'platform', 'system', 'technology'],
+                'interests': ['interest', 'hobby', 'passion', 'enjoy', 'like'],
+                'references': ['reference', 'referee', 'recommendation', 'endorsement'],
+                'additional': ['additional', 'miscellaneous', 'other', 'extra']
             }
             
             keywords = section_keywords.get(section_type.lower(), [])
@@ -2302,14 +3356,25 @@ def smart_section_integration(cv_content: str, section_type: str, new_content: L
                 'experience': 'WORK EXPERIENCE', 
                 'education': 'EDUCATION',
                 'projects': 'PROJECTS',
-                'contact': 'CONTACT INFORMATION'
+                'contact': 'CONTACT INFORMATION',
+                'objective': 'CAREER OBJECTIVE',
+                'certifications': 'CERTIFICATIONS',
+                'research': 'RESEARCH',
+                'achievements': 'ACHIEVEMENTS',
+                'leadership': 'LEADERSHIP',
+                'volunteer': 'VOLUNTEER WORK',
+                'languages': 'LANGUAGES',
+                'technologies': 'TECHNOLOGIES',
+                'interests': 'INTERESTS',
+                'references': 'REFERENCES',
+                'additional': 'ADDITIONAL INFORMATION'
             }
             
             header = section_headers.get(section_type, section_type.upper())
             full_content = [f"\n{header}"] + new_content + [""]
             
             # Determine best insertion point based on standard CV order
-            cv_order = ['skills', 'experience', 'education', 'projects', 'contact']
+            cv_order = ['objective', 'skills', 'experience', 'education', 'projects', 'certifications', 'research', 'achievements', 'leadership', 'volunteer', 'languages', 'technologies', 'interests', 'references', 'additional', 'contact']
             current_index = cv_order.index(section_type) if section_type in cv_order else len(cv_order)
             
             # Find insertion point based on existing sections
@@ -2537,6 +3602,90 @@ def extract_section_from_cv(cv_content: str, section_name: str) -> str:
             r'[_\-\s]*PROJECTS?\s+AND\s+ACHIEVEMENTS[_\-\s]*',
             r'[_\-\s]*PROJECTS?\s+PORTFOLIO[_\-\s]*',
             r'[_\-\s]*PROJECTS?\s+SUMMARY[_\-\s]*'
+        ],
+        'contact': [
+            r'[_\-\s]*CONTACT[_\-\s]*',
+            r'[_\-\s]*CONTACT\s+INFORMATION[_\-\s]*',
+            r'[_\-\s]*CONTACT\s+DETAILS[_\-\s]*',
+            r'[_\-\s]*PERSONAL\s+INFORMATION[_\-\s]*',
+            r'[_\-\s]*CONTACT\s+INFO[_\-\s]*'
+        ],
+        'objective': [
+            r'[_\-\s]*OBJECTIVE[_\-\s]*',
+            r'[_\-\s]*CAREER\s+OBJECTIVE[_\-\s]*',
+            r'[_\-\s]*PROFESSIONAL\s+OBJECTIVE[_\-\s]*',
+            r'[_\-\s]*GOAL[_\-\s]*',
+            r'[_\-\s]*CAREER\s+GOAL[_\-\s]*'
+        ],
+        'certifications': [
+            r'[_\-\s]*CERTIFICATIONS[_\-\s]*',
+            r'[_\-\s]*CERTIFICATES[_\-\s]*',
+            r'[_\-\s]*PROFESSIONAL\s+CERTIFICATIONS[_\-\s]*',
+            r'[_\-\s]*LICENSES[_\-\s]*',
+            r'[_\-\s]*CREDENTIALS[_\-\s]*',
+            r'[_\-\s]*TRAINING[_\-\s]*'
+        ],
+        'research': [
+            r'[_\-\s]*RESEARCH[_\-\s]*',
+            r'[_\-\s]*PUBLICATIONS[_\-\s]*',
+            r'[_\-\s]*RESEARCH\s+PAPERS[_\-\s]*',
+            r'[_\-\s]*ACADEMIC\s+PUBLICATIONS[_\-\s]*',
+            r'[_\-\s]*THESIS[_\-\s]*',
+            r'[_\-\s]*DISSERTATION[_\-\s]*',
+            r'[_\-\s]*STUDIES[_\-\s]*'
+        ],
+        'achievements': [
+            r'[_\-\s]*ACHIEVEMENTS[_\-\s]*',
+            r'[_\-\s]*AWARDS[_\-\s]*',
+            r'[_\-\s]*HONORS[_\-\s]*',
+            r'[_\-\s]*RECOGNITIONS[_\-\s]*',
+            r'[_\-\s]*SCHOLARSHIPS[_\-\s]*',
+            r'[_\-\s]*ACCOMPLISHMENTS[_\-\s]*'
+        ],
+        'leadership': [
+            r'[_\-\s]*LEADERSHIP[_\-\s]*',
+            r'[_\-\s]*MANAGEMENT[_\-\s]*',
+            r'[_\-\s]*TEAM\s+LEADERSHIP[_\-\s]*',
+            r'[_\-\s]*SUPERVISION[_\-\s]*',
+            r'[_\-\s]*DIRECTION[_\-\s]*'
+        ],
+        'volunteer': [
+            r'[_\-\s]*VOLUNTEER[_\-\s]*',
+            r'[_\-\s]*VOLUNTEER\s+WORK[_\-\s]*',
+            r'[_\-\s]*COMMUNITY\s+SERVICE[_\-\s]*',
+            r'[_\-\s]*CHARITY\s+WORK[_\-\s]*',
+            r'[_\-\s]*PRO\s+BONO[_\-\s]*'
+        ],
+        'languages': [
+            r'[_\-\s]*LANGUAGES[_\-\s]*',
+            r'[_\-\s]*LANGUAGE\s+SKILLS[_\-\s]*',
+            r'[_\-\s]*SPOKEN\s+LANGUAGES[_\-\s]*',
+            r'[_\-\s]*LINGUISTIC\s+SKILLS[_\-\s]*'
+        ],
+        'technologies': [
+            r'[_\-\s]*TECHNOLOGIES[_\-\s]*',
+            r'[_\-\s]*TOOLS[_\-\s]*',
+            r'[_\-\s]*SOFTWARE[_\-\s]*',
+            r'[_\-\s]*PLATFORMS[_\-\s]*',
+            r'[_\-\s]*SYSTEMS[_\-\s]*'
+        ],
+        'interests': [
+            r'[_\-\s]*INTERESTS[_\-\s]*',
+            r'[_\-\s]*HOBBIES[_\-\s]*',
+            r'[_\-\s]*PERSONAL\s+INTERESTS[_\-\s]*',
+            r'[_\-\s]*PASSIONS[_\-\s]*'
+        ],
+        'references': [
+            r'[_\-\s]*REFERENCES[_\-\s]*',
+            r'[_\-\s]*REFEREES[_\-\s]*',
+            r'[_\-\s]*RECOMMENDATIONS[_\-\s]*',
+            r'[_\-\s]*ENDORSEMENTS[_\-\s]*'
+        ],
+        'additional': [
+            r'[_\-\s]*ADDITIONAL[_\-\s]*',
+            r'[_\-\s]*MISCELLANEOUS[_\-\s]*',
+            r'[_\-\s]*OTHER[_\-\s]*',
+            r'[_\-\s]*EXTRA[_\-\s]*'
         ]
     }
     patterns = section_patterns.get(section_name.lower(), [rf'[_\-\s]*{section_name.upper()}[_\-\s]*'])
@@ -2583,6 +3732,66 @@ def parse_cv_sections(cv_content: str) -> dict:
             r'^\s*PERSONAL\s+PROJECTS?\s*$', r'^\s*PORTFOLIO\s*$', r'^\s*SELECTED\s+PROJECTS?\s*$',
             r'^\s*MAJOR\s+PROJECTS?\s*$', r'^\s*PROJECT\s+EXPERIENCE\s*$', r'^\s*PROFESSIONAL\s+PROJECTS?\s*$',
             r'^\s*_+\s*PROJECTS?\s*_+\s*$'
+        ],
+        'contact': [
+            r'^\s*CONTACT\s*$', r'^\s*CONTACT\s+INFORMATION\s*$', r'^\s*CONTACT\s+DETAILS\s*$',
+            r'^\s*PERSONAL\s+INFORMATION\s*$', r'^\s*CONTACT\s+INFO\s*$',
+            r'^\s*_+\s*CONTACT\s*_+\s*$', r'^\s*_+\s*CONTACT\s+INFORMATION\s*_+\s*$'
+        ],
+        'objective': [
+            r'^\s*OBJECTIVE\s*$', r'^\s*CAREER\s+OBJECTIVE\s*$', r'^\s*PROFESSIONAL\s+OBJECTIVE\s*$',
+            r'^\s*GOAL\s*$', r'^\s*CAREER\s+GOAL\s*$',
+            r'^\s*_+\s*OBJECTIVE\s*_+\s*$', r'^\s*_+\s*CAREER\s+OBJECTIVE\s*_+\s*$'
+        ],
+        'certifications': [
+            r'^\s*CERTIFICATIONS\s*$', r'^\s*CERTIFICATES\s*$', r'^\s*PROFESSIONAL\s+CERTIFICATIONS\s*$',
+            r'^\s*LICENSES\s*$', r'^\s*CREDENTIALS\s*$', r'^\s*TRAINING\s*$',
+            r'^\s*_+\s*CERTIFICATIONS\s*_+\s*$'
+        ],
+        'research': [
+            r'^\s*RESEARCH\s*$', r'^\s*PUBLICATIONS\s*$', r'^\s*RESEARCH\s+PAPERS\s*$',
+            r'^\s*ACADEMIC\s+PUBLICATIONS\s*$', r'^\s*THESIS\s*$', r'^\s*DISSERTATION\s*$',
+            r'^\s*STUDIES\s*$', r'^\s*_+\s*RESEARCH\s*_+\s*$'
+        ],
+        'achievements': [
+            r'^\s*ACHIEVEMENTS\s*$', r'^\s*AWARDS\s*$', r'^\s*HONORS\s*$',
+            r'^\s*RECOGNITIONS\s*$', r'^\s*SCHOLARSHIPS\s*$', r'^\s*ACCOMPLISHMENTS\s*$',
+            r'^\s*_+\s*ACHIEVEMENTS\s*_+\s*$'
+        ],
+        'leadership': [
+            r'^\s*LEADERSHIP\s*$', r'^\s*MANAGEMENT\s*$', r'^\s*TEAM\s+LEADERSHIP\s*$',
+            r'^\s*SUPERVISION\s*$', r'^\s*DIRECTION\s*$',
+            r'^\s*_+\s*LEADERSHIP\s*_+\s*$'
+        ],
+        'volunteer': [
+            r'^\s*VOLUNTEER\s*$', r'^\s*VOLUNTEER\s+WORK\s*$', r'^\s*COMMUNITY\s+SERVICE\s*$',
+            r'^\s*CHARITY\s+WORK\s*$', r'^\s*PRO\s+BONO\s*$',
+            r'^\s*_+\s*VOLUNTEER\s*_+\s*$'
+        ],
+        'languages': [
+            r'^\s*LANGUAGES\s*$', r'^\s*LANGUAGE\s+SKILLS\s*$', r'^\s*SPOKEN\s+LANGUAGES\s*$',
+            r'^\s*LINGUISTIC\s+SKILLS\s*$',
+            r'^\s*_+\s*LANGUAGES\s*_+\s*$'
+        ],
+        'technologies': [
+            r'^\s*TECHNOLOGIES\s*$', r'^\s*TOOLS\s*$', r'^\s*SOFTWARE\s*$',
+            r'^\s*PLATFORMS\s*$', r'^\s*SYSTEMS\s*$',
+            r'^\s*_+\s*TECHNOLOGIES\s*_+\s*$'
+        ],
+        'interests': [
+            r'^\s*INTERESTS\s*$', r'^\s*HOBBIES\s*$', r'^\s*PERSONAL\s+INTERESTS\s*$',
+            r'^\s*PASSIONS\s*$',
+            r'^\s*_+\s*INTERESTS\s*_+\s*$'
+        ],
+        'references': [
+            r'^\s*REFERENCES\s*$', r'^\s*REFEREES\s*$', r'^\s*RECOMMENDATIONS\s*$',
+            r'^\s*ENDORSEMENTS\s*$',
+            r'^\s*_+\s*REFERENCES\s*_+\s*$'
+        ],
+        'additional': [
+            r'^\s*ADDITIONAL\s*$', r'^\s*MISCELLANEOUS\s*$', r'^\s*OTHER\s*$',
+            r'^\s*EXTRA\s*$',
+            r'^\s*_+\s*ADDITIONAL\s*_+\s*$'
         ]
     }
     
@@ -2784,7 +3993,7 @@ async def test_download_endpoint(request: ProjectSelectionRequest):
         "received_ids": request.selected_project_ids,
         "ids_type": str(type(request.selected_project_ids)),
         "ids_length": len(request.selected_project_ids) if request.selected_project_ids else 0
-    }
+        }
 
 @app.post("/upload-cv/")
 async def upload_cv(
