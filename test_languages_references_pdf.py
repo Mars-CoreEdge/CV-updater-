@@ -23,7 +23,7 @@ def test_languages_references_with_pdf():
         ("REFERENCE_ADD", "References available upon request"),
         ("REFERENCE_ADD", "Professional references from Google and Microsoft")
     ]
-    
+ #code hard 
     results = []
     total_tests = len(test_cases)
     passed_tests = 0
