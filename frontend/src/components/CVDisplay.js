@@ -993,11 +993,63 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
         yPosition += 10; // Space after header and line
       };
       
-      // Parse CV content intelligently
+      // Helper function to add contact info block
+      const addContactBlock = (contactLines) => {
+        checkPageBreak(20);
+        yPosition += 5; // Space before contact block
+        
+        // Add contact info with special formatting
+        for (const contactLine of contactLines) {
+          addFormattedText(contactLine, 10, 'normal', 'center');
+          yPosition += 2; // Tighter spacing for contact info
+        }
+        
+        yPosition += 5; // Space after contact block
+      };
+      
+      // Use the same parsing logic as the display
       const content = cvData.content;
       const lines = content.split('\n');
       
-      let isFirstLine = true;
+      // Reuse the same detection functions from formatCVContent
+      const isSectionHeader = (line) => {
+        const cleanLine = line.trim();
+        const sectionKeywords = [
+          'PROFILE', 'SUMMARY', 'OBJECTIVE', 'SKILLS', 'TECHNICAL SKILLS', 'COMPETENCIES',
+          'EXPERIENCE', 'WORK EXPERIENCE', 'EMPLOYMENT', 'PROFESSIONAL EXPERIENCE',
+          'EDUCATION', 'ACADEMIC', 'QUALIFICATIONS', 'PROJECTS', 'PORTFOLIO',
+          'CERTIFICATIONS', 'AWARDS', 'ACHIEVEMENTS', 'LANGUAGES', 'REFERENCES',
+          'INTERESTS', 'HOBBIES', 'VOLUNTEER', 'ACTIVITIES'
+        ];
+        
+        const hasKeyword = sectionKeywords.some(keyword => 
+          cleanLine.toUpperCase().includes(keyword)
+        );
+        
+        const isStandalone = cleanLine.length > 3 && cleanLine.length < 50;
+        const isAtStart = cleanLine === cleanLine.split(' ')[0] || 
+                         (cleanLine.length > 10 && 
+                          cleanLine.trim().startsWith(cleanLine.split(' ')[0]));
+        
+        // Additional checks to prevent false positives
+        // Don't treat lines with colons as section headers unless they're very short
+        const hasColon = line.includes(':');
+        const isShortWithColon = hasColon && cleanLine.length < 15;
+        
+        // Don't treat lines that are clearly part of content as section headers
+        const isContentLine = line.includes(',') || line.includes('.') || line.includes('●') || line.includes('•');
+        
+        // Must be a main section keyword, not a sub-section
+        const isMainSection = hasKeyword && !isContentLine && (isStandalone || isAtStart) && (!hasColon || isShortWithColon);
+        
+        return isMainSection;
+      };
+      
+      const contactRegex = /@|\+\d{1,3}[\s\-]?\d{3,4}[\s\-]?\d{3,4}|linkedin\.com|github\.com|email:|phone:|address:|www\.|(http|https):\/\/|gmail\.com|outlook\.com|yahoo\.com/i;
+      
+      let nameRendered = false;
+      let contactBlock = [];
+      let lastWasSection = false;
       
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -1007,39 +1059,77 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
           continue;
         }
         
-        // Detect section headers (uppercase lines or lines with specific patterns)
-        const isHeader = (
-          line.toUpperCase() === line && 
-          line.length > 3 && 
-          line.length < 50 &&
-          (line.includes('PROFILE') || line.includes('SUMMARY') || 
-           line.includes('SKILLS') || line.includes('EXPERIENCE') || 
-           line.includes('EDUCATION') || line.includes('PROJECTS') ||
-           line.includes('WORK') || line.includes('PROFESSIONAL'))
-        );
+        // Section headers: improved detection - check this first
+        if (isSectionHeader(line)) {
+          // Render any pending contact block before section header
+          if (contactBlock.length > 0) {
+            addContactBlock(contactBlock);
+            contactBlock = [];
+          }
+          addSectionHeader(line);
+          lastWasSection = true;
+          continue;
+        }
+        
+        // Collect contact info lines (immediately after name, up to 3 lines)
+        if (nameRendered && contactBlock.length < 3 && contactRegex.test(line)) {
+          // Additional check to ensure it's actually contact info, not just content with @ or +
+          const isActualContact = line.includes('@') || 
+                                 line.includes('linkedin.com') || 
+                                 line.includes('github.com') || 
+                                 line.includes('gmail.com') || 
+                                 line.includes('outlook.com') || 
+                                 line.includes('yahoo.com') ||
+                                 /^\+\d{1,3}[\s\-]?\d{3,4}[\s\-]?\d{3,4}$/.test(line.trim()) ||
+                                 /^phone:/.test(line.toLowerCase()) ||
+                                 /^email:/.test(line.toLowerCase()) ||
+                                 /^address:/.test(line.toLowerCase());
+          
+          if (isActualContact) {
+            contactBlock.push(line);
+            continue;
+          }
+        }
+        
+        // Additional check for contact info that might be missed
+        if (nameRendered && contactBlock.length < 3 && (line.includes('@') || line.includes('+') || line.includes('linkedin.com') || line.includes('github.com'))) {
+          // Only add if it's clearly contact info, not content
+          const isClearContact = line.includes('@') && (line.includes('gmail.com') || line.includes('outlook.com') || line.includes('yahoo.com')) ||
+                                line.includes('linkedin.com') ||
+                                line.includes('github.com') ||
+                                /^\+\d{1,3}[\s\-]?\d{3,4}[\s\-]?\d{3,4}$/.test(line.trim());
+          
+          if (isClearContact) {
+            contactBlock.push(line);
+            continue;
+          }
+        }
+        
+        // Render contact block if we have collected some and encounter non-contact content
+        if (contactBlock.length > 0 && !contactRegex.test(line) && !isSectionHeader(line)) {
+          addContactBlock(contactBlock);
+          contactBlock = [];
+        }
+        
+        lastWasSection = false;
         
         // Detect name (usually first significant line)
-        const isName = isFirstLine && line.length > 5 && line.length < 50 && !line.includes('@');
-        
-        // Detect contact info (contains email, phone, etc.)
-        const isContactInfo = line.includes('@') || line.includes('+') || line.includes('linkedin') || line.includes('github');
+        const isName = !nameRendered && line.length > 5 && line.length < 50 && !line.includes('@') && !isSectionHeader(line);
         
         if (isName) {
           addFormattedText(line, 18, 'bold', 'center');
           yPosition += 5;
-          isFirstLine = false;
-        } else if (isContactInfo) {
-          addFormattedText(line, 10, 'normal', 'center');
-          yPosition += 3;
-        } else if (isHeader) {
-          addSectionHeader(line);
-        } else {
-          // Regular content - smaller text under headings
-          let fontSize = 9;  // Reduced from 11 to 9
-          let style = 'bold';  // Changed from 'normal' to 'bold' for better readability
+          nameRendered = true;
+        } else if (contactBlock.length === 0) {
+          // Regular content - handle different types
+          let fontSize = 9;
+          let style = 'normal';
           
-          // Format based on content type
-          if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
+          // Special handling for certification content (lines that look like certification names)
+          if (lastWasSection && line.length > 10 && line.length < 100 && !line.includes('●') && !line.includes('•')) {
+            // This might be a certification name or description
+            addFormattedText(line, fontSize, 'bold');
+          } else if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
             // Bullet points
             const bulletText = '• ' + line.substring(1).trim();
             addFormattedText(bulletText, fontSize, style);
@@ -1092,6 +1182,10 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
 
   const printCV = () => {
     const printWindow = window.open('', '_blank');
+    
+    // Use the same formatting logic as the display
+    const formattedContent = formatCVContent(cvData?.content || '');
+    
     printWindow.document.write(`
       <html>
         <head>
@@ -1113,10 +1207,47 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
             ul, ol { margin-left: 1.5em; margin-bottom: 1em; }
             li { margin-bottom: 0.3em; }
             strong { font-weight: 600; }
+            .contact-info {
+              text-align: center;
+              margin-bottom: 2em;
+              padding: 1.5em;
+              background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(102, 126, 234, 0.03));
+              border-radius: 12px;
+              font-size: 0.95rem;
+              color: #2d3748;
+              border: 1px solid rgba(102, 126, 234, 0.15);
+              box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+              font-weight: 500;
+            }
+            .cv-section-header {
+              color: #667eea;
+              font-size: 1.3rem;
+              font-weight: 600;
+              margin-top: 1.5em;
+              margin-bottom: 0.8em;
+              border-bottom: 2px solid #667eea;
+              padding-bottom: 0.5em;
+            }
+            .cv-paragraph {
+              margin-bottom: 0.8em;
+              line-height: 1.5;
+            }
+            @media print {
+              body { 
+                max-width: none; 
+                margin: 0; 
+                padding: 15px;
+              }
+              .contact-info {
+                background: rgba(102, 126, 234, 0.05);
+                border: 1px solid rgba(102, 126, 234, 0.2);
+                box-shadow: none;
+              }
+            }
           </style>
         </head>
         <body>
-          <pre style="white-space: pre-wrap; font-family: inherit;">${cvData?.content}</pre>
+          ${formattedContent}
         </body>
       </html>
     `);
