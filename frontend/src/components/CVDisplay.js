@@ -270,11 +270,14 @@ const CVContent = styled.div`
   .contact-info {
     text-align: center;
     margin-bottom: 2em;
-    padding: 1em;
-    background: rgba(102, 126, 234, 0.05);
-    border-radius: 8px;
-    font-size: 0.9rem;
-    color: #4a5568;
+    padding: 1.5em;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(102, 126, 234, 0.03));
+    border-radius: 12px;
+    font-size: 0.95rem;
+    color: #2d3748;
+    border: 1px solid rgba(102, 126, 234, 0.15);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    font-weight: 500;
   }
   
   /* CV Name styling */
@@ -631,6 +634,10 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
 
   const formatCVContent = (content) => {
     if (!content) return '';
+    
+    // Clean Zero Width Space characters and normalize line endings
+    content = content.replace(/\u200B/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    
     if (content.length < 100 || content.includes('[File:') || content.includes('PDF uploaded successfully')) {
       return content;
     }
@@ -737,22 +744,34 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
                        (line.trim().toUpperCase() === cleanLine || 
                         line.trim().startsWith(cleanLine.split(' ')[0]));
       
-      return hasKeyword && (isStandalone || isAtStart);
+      // Additional checks to prevent false positives
+      // Don't treat lines with colons as section headers unless they're very short
+      const hasColon = line.includes(':');
+      const isShortWithColon = hasColon && cleanLine.length < 15;
+      
+      // Don't treat lines that are clearly part of content as section headers
+      const isContentLine = line.includes(',') || line.includes('.') || line.includes('●') || line.includes('•');
+      
+      // Must be a main section keyword, not a sub-section
+      const isMainSection = hasKeyword && !isContentLine && (isStandalone || isAtStart) && (!hasColon || isShortWithColon);
+      
+      const result = isMainSection;
+      if (result) {
+        console.log('[CV Display] Section header detected:', { line, cleanLine, hasKeyword, isStandalone, isAtStart, hasColon, isContentLine });
+      }
+      return result;
     };
     
     const bulletRegex = /^([\u2022\u2023\u25E6\u2043\u2219\*-])\s?(.*)/;
-    const contactRegex = /@|\+\d|linkedin|github|email|www\./i;
+    const contactRegex = /@|\+\d{1,3}[\s\-]?\d{3,4}[\s\-]?\d{3,4}|linkedin\.com|github\.com|email:|phone:|address:|www\.|(http|https):\/\/|gmail\.com|outlook\.com|yahoo\.com/i;
     
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i].trim();
+      console.log(`[CV Display] Processing line ${i}: "${line}"`);
       if (!line) {
         if (inList) {
           html += '</ul>';
           inList = false;
-        }
-        if (contactBlock.length > 0) {
-          html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
-          contactBlock = [];
         }
         continue;
       }
@@ -765,27 +784,66 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
         continue;
       }
       
-      // Collect contact info lines (immediately after name, up to 3 lines)
-      if (nameRendered && contactBlock.length < 3 && contactRegex.test(line)) {
-        contactBlock.push(line);
-        continue;
-      }
-      
-      if (contactBlock.length > 0) {
-        html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
-        contactBlock = [];
-      }
-      
-      // Section headers: improved detection
+      // Section headers: improved detection - check this first
       if (isSectionHeader(line)) {
+        console.log('[CV Display] Detected section header:', line);
         if (inList) {
           html += '</ul>';
           inList = false;
+        }
+        // Render any pending contact block before section header
+        if (contactBlock.length > 0) {
+          console.log('[CV Display] Rendering contact block before section:', contactBlock);
+          html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
+          contactBlock = [];
         }
         // Section heading: use CSS classes instead of inline styles
         html += `<h2 class="cv-section-header">${line}</h2>`;
         lastWasSection = true;
         continue;
+      }
+      
+      // Collect contact info lines (immediately after name, up to 3 lines)
+      if (nameRendered && contactBlock.length < 3 && contactRegex.test(line)) {
+        // Additional check to ensure it's actually contact info, not just content with @ or +
+        const isActualContact = line.includes('@') || 
+                               line.includes('linkedin.com') || 
+                               line.includes('github.com') || 
+                               line.includes('gmail.com') || 
+                               line.includes('outlook.com') || 
+                               line.includes('yahoo.com') ||
+                               /^\+\d{1,3}[\s\-]?\d{3,4}[\s\-]?\d{3,4}$/.test(line.trim()) ||
+                               /^phone:/.test(line.toLowerCase()) ||
+                               /^email:/.test(line.toLowerCase()) ||
+                               /^address:/.test(line.toLowerCase());
+        
+        if (isActualContact) {
+          console.log('[CV Display] Detected contact info:', line);
+          contactBlock.push(line);
+          continue;
+        }
+      }
+      
+      // Additional check for contact info that might be missed
+      if (nameRendered && contactBlock.length < 3 && (line.includes('@') || line.includes('+') || line.includes('linkedin.com') || line.includes('github.com'))) {
+        // Only add if it's clearly contact info, not content
+        const isClearContact = line.includes('@') && (line.includes('gmail.com') || line.includes('outlook.com') || line.includes('yahoo.com')) ||
+                              line.includes('linkedin.com') ||
+                              line.includes('github.com') ||
+                              /^\+\d{1,3}[\s\-]?\d{3,4}[\s\-]?\d{3,4}$/.test(line.trim());
+        
+        if (isClearContact) {
+          console.log('[CV Display] Detected contact info (fallback):', line);
+          contactBlock.push(line);
+          continue;
+        }
+      }
+      
+      // Render contact block if we have collected some and encounter non-contact content
+      if (contactBlock.length > 0 && !contactRegex.test(line) && !isSectionHeader(line)) {
+        console.log('[CV Display] Rendering contact block before content:', contactBlock);
+        html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
+        contactBlock = [];
       }
       
       lastWasSection = false;
@@ -804,18 +862,31 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
         inList = false;
       }
       
+      // Special handling for certification content (lines that look like certification names)
+      if (lastWasSection && line.length > 10 && line.length < 100 && !line.includes('●') && !line.includes('•')) {
+        // This might be a certification name or description
+        console.log('[CV Display] Potential certification content:', line);
+        html += `<p class="cv-paragraph"><strong>${line}</strong></p>`;
+        continue;
+      }
+      
       // Job titles/companies: only bold if line is short and after a section header
       if (line.length < 60 && i > 0 && isSectionHeader(lines[i-1])) {
         html += `<div class="cv-job-title">${line}</div>`;
         continue;
       }
       
-      // Regular paragraph
-      html += `<p class="cv-paragraph">${line}</p>`;
+      // Regular paragraph (but not contact info)
+      if (!contactRegex.test(line)) {
+        html += `<p class="cv-paragraph">${line}</p>`;
+      } else {
+        console.log('[CV Display] Skipping contact line as regular paragraph:', line);
+      }
     }
     
     if (inList) html += '</ul>';
     if (contactBlock.length > 0) {
+      console.log('[CV Display] Final contact block rendering:', contactBlock);
       html += `<div class="contact-info">${contactBlock.join('<br/>')}</div>`;
     }
     

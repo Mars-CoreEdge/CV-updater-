@@ -1050,7 +1050,7 @@ SKILL_ADD: adding new skills ("I learned", "I know", "add skill", "skilled in")
 EXPERIENCE_ADD: adding work experience ("I worked", "I was employed", "job at", "worked as")
 EDUCATION_ADD: adding education ("I studied", "graduated from", "degree in", "certification in")
 PROJECT_ADD: adding new project ("I built", "I created", "I developed", "project called")
-CONTACT_ADD: adding contact info ("my email is", "phone number", "linkedin", "address")
+CONTACT_ADD: adding contact info ("my email is", "phone number", "linkedin", "address", "my name is", "i am", "age", "github", "twitter", "facebook", "instagram", "youtube", "portfolio", "website", "gmail", "outlook", "yahoo", "contact me", "reach me", "call me", "text me", "whatsapp", "telegram", "discord", "slack", "skype", "zoom", "meet", "teams")
 OBJECTIVE_ADD: adding career objective ("my objective", "career goal", "aim to", "professional objective")
 CERTIFICATION_ADD: adding certifications ("certified", "license", "credential", "training")
 RESEARCH_ADD: adding research ("research paper", "publication", "study", "thesis")
@@ -1460,7 +1460,7 @@ def classify_message_fallback(message: str, cv_content: str = None) -> dict:
     elif any(phrase in msg for phrase in ["i built", "i created", "i developed", "project called", "designed", "implemented"]):
         print("[DEBUG] classify_message_fallback: Detected PROJECT_ADD")
         return {"category": "PROJECT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
-    elif any(phrase in msg for phrase in ["my email is", "phone number", "linkedin", "address", "contact me", "reach me"]):
+    elif any(phrase in msg for phrase in ["my email is", "phone number", "linkedin", "address", "my name is", "i am", "age", "github", "twitter", "facebook", "instagram", "youtube", "portfolio", "website", "gmail", "outlook", "yahoo", "contact me", "reach me", "call me", "text me", "whatsapp", "telegram", "discord", "slack", "skype", "zoom", "meet", "teams"]):
         print("[DEBUG] classify_message_fallback: Detected CONTACT_ADD")
         return {"category": "CONTACT_ADD", "extracted_info": message.strip(), "operation": "CREATE"}
     
@@ -3284,8 +3284,20 @@ def extract_experience_from_message(message: str) -> str:
 
 def extract_contact_from_message(message: str) -> str:
     """Extract contact information from message"""
-    clean_message = re.sub(r'^(my email is|phone number|my phone|contact|address)\s*', '', message.lower()).strip()
-    return clean_message
+    # Remove common prefixes for all contact types
+    contact_prefixes = [
+        'my email is', 'phone number', 'my phone', 'contact', 'address',
+        'my name is', 'i am', 'age', 'github', 'twitter', 'facebook', 'instagram',
+        'youtube', 'portfolio', 'website', 'gmail', 'outlook', 'yahoo',
+        'contact me', 'reach me', 'call me', 'text me', 'whatsapp', 'telegram',
+        'discord', 'slack', 'skype', 'zoom', 'meet', 'teams'
+    ]
+    
+    clean_message = message.lower()
+    for prefix in contact_prefixes:
+        clean_message = re.sub(rf'^{prefix}\s*', '', clean_message)
+    
+    return clean_message.strip()
 
 def clean_duplicate_project_sections(cv_content: str) -> str:
     """Remove all project sections and additional sections"""
@@ -5745,156 +5757,85 @@ Return only the formatted CV content, no additional commentary."""
 def reorganize_cv_content(cv_content: str) -> str:
     """Reorganize CV content to ensure proper section placement"""
     try:
+        # Clean Zero Width Space characters
+        cv_content = cv_content.replace('\u200B', '')
         lines = cv_content.split('\n')
-        organized_sections = {
-            'personal_info': [],
-            'profile_summary': [],
-            'skills': [],
-            'experience': [],
-            'education': [],
-            'projects': []
-        }
         
-        current_section = 'personal_info'
+        # Helper function to check if a line is a potential section header
+        def is_potential_header_reorganize(line: str) -> bool:
+            """Check if a line is a potential section header"""
+            line_upper = line.upper().strip()
+            section_keywords = [
+                'EDUCATION', 'EXPERIENCE', 'SKILLS', 'PROJECTS', 'CERTIFICATIONS',
+                'PROFILE', 'SUMMARY', 'OBJECTIVE', 'ACHIEVEMENTS', 'LEADERSHIP',
+                'VOLUNTEER', 'LANGUAGES', 'TECHNOLOGIES', 'INTERESTS', 'REFERENCES',
+                'ADDITIONAL', 'ACTIVITIES', 'AWARDS', 'PUBLICATIONS', 'RESEARCH'
+            ]
+            return any(keyword in line_upper for keyword in section_keywords)
         
-        for line in lines:
+        # Extract name and contact info from the very beginning
+        name_and_contact = []
+        remaining_lines = []
+        found_first_section = False
+        
+        for i, line in enumerate(lines):
             line_stripped = line.strip()
             
-            # Detect section headers with more flexible patterns
-            if (re.search(r'PROFILE\s+SUMMARY', line_stripped, re.IGNORECASE) or 
-                re.search(r'^\s*_+\s*PROFILE\s*_+\s*$', line_stripped, re.IGNORECASE)):
-                current_section = 'profile_summary'
-                continue
-            elif (re.search(r'^\s*_+\s*SKILLS?\s*_+\s*$', line_stripped, re.IGNORECASE) or
-                  re.search(r'TECHNICAL\s+SKILLS?', line_stripped, re.IGNORECASE) or
-                  re.search(r'PROFESSIONAL\s+SKILLS?', line_stripped, re.IGNORECASE)):
-                current_section = 'skills'
-                continue
-            elif (re.search(r'^\s*_+\s*WORK\s+EXPERIENCE\s*_+\s*$', line_stripped, re.IGNORECASE) or
-                  re.search(r'^\s*_+\s*EXPERIENCE\s*_+\s*$', line_stripped, re.IGNORECASE) or
-                  re.search(r'^\s*WORK\s+EXPERIENCE\s*$', line_stripped, re.IGNORECASE)):
-                current_section = 'experience'
-                continue
-            elif (re.search(r'^\s*_+\s*EDUCATION\s*_+\s*$', line_stripped, re.IGNORECASE) or
-                  re.search(r'^\s*_+\s*EDUCATIONAL\s*_+\s*$', line_stripped, re.IGNORECASE) or
-                  re.search(r'^\s*EDUCATION\s*$', line_stripped, re.IGNORECASE)):
-                current_section = 'education'
-                continue
-            elif (re.search(r'^\s*_+\s*PROJECTS?\s*_+\s*$', line_stripped, re.IGNORECASE) or
-                  re.search(r'^\s*PROJECTS?\s*$', line_stripped, re.IGNORECASE)):
-                current_section = 'projects'
-                continue
-            
-            # Smart content classification for unorganized content
-            if line_stripped and current_section == 'personal_info':
-                # Enhanced parsing for pipe-separated content
-                if '|' in line_stripped and len(line_stripped) > 100:
-                    # Split by pipes and analyze each part
-                    parts = [part.strip() for part in line_stripped.split('|')]
-                    
-                    # Keep contact info in personal_info
-                    contact_parts = []
-                    experience_parts = []
-                    education_parts = []
-                    
-                    for part in parts:
-                        part_lower = part.lower()
-                        
-                        # Contact information (phone, email)
-                        if re.search(r'[\+\d\-\(\)\s]+', part) or '@' in part or 'gmail' in part_lower or 'yahoo' in part_lower:
-                            contact_parts.append(part)
-                        
-                        # Experience content
-                        elif (re.search(r'\b(internship|job|position|role|worked|employed)\b', part_lower) or
-                              re.search(r'\b(202[0-9]|201[0-9])\s*[-–]\s*(202[0-9]|201[0-9]|present|current|now)\b', part) or
-                              re.search(r'\b(company|corp|inc|ltd|soft|tech|solutions)\b', part_lower)):
-                            experience_parts.append(part)
-                        
-                        # Education content
-                        elif (re.search(r'\b(graduated|degree|university|college|school|bachelor|master|phd)\b', part_lower) or
-                              re.search(r'\b(202[0-9]|201[0-9])\b', part) and 'graduated' in part_lower):
-                            education_parts.append(part)
-                        
-                        # Profile/summary content
-                        else:
-                            # This might be profile summary content
-                            if len(part) > 20 and not re.search(r'\b(202[0-9]|201[0-9])\b', part):
-                                organized_sections['profile_summary'].append(part)
-                    
-                    # Add contact parts to personal_info
-                    if contact_parts:
-                        organized_sections['personal_info'].append(' | '.join(contact_parts))
-                    
-                    # Add experience parts to experience section
-                    if experience_parts:
-                        organized_sections['experience'].extend(experience_parts)
-                    
-                    # Add education parts to education section
-                    if education_parts:
-                        organized_sections['education'].extend(education_parts)
-                    
-                    continue
-                
-                # Check if this line contains education-related content
-                if (re.search(r'\b(202[0-9]|201[0-9]|202[0-9])\b', line_stripped) or  # Years
-                    re.search(r'\b(graduated|degree|university|college|school|bachelor|master|phd)\b', line_stripped, re.IGNORECASE)):
-                    current_section = 'education'
-                    organized_sections['education'].append(line_stripped)
-                    continue
-                # Check if this line contains experience-related content
-                elif (re.search(r'\b(experience|worked|job|position|role|employed|internship)\b', line_stripped, re.IGNORECASE) or
-                      re.search(r'\b(202[0-9]|201[0-9])\s*[-–]\s*(present|current|now)\b', line_stripped, re.IGNORECASE)):
-                    current_section = 'experience'
-                    organized_sections['experience'].append(line_stripped)
-                    continue
-                # Check if this line contains skills-related content
-                elif (re.search(r'\b(react|javascript|python|java|html|css|node|sql|aws|docker)\b', line_stripped, re.IGNORECASE) or
-                      re.search(r'\b(skills|technologies|tools|frameworks|languages)\b', line_stripped, re.IGNORECASE)):
-                    current_section = 'skills'
-                    organized_sections['skills'].append(line_stripped)
-                continue
-            
-            # Add content to current section (include non-empty lines)
-            if line_stripped and current_section:
-                organized_sections[current_section].append(line_stripped)
+            # If we haven't found the first section header yet, collect as name/contact
+            if not found_first_section and line_stripped:
+                if is_potential_header_reorganize(line_stripped):
+                    found_first_section = True
+                    remaining_lines.append(line_stripped)
+                else:
+                    name_and_contact.append(line_stripped)
+            else:
+                remaining_lines.append(line_stripped)
+        
+        # Parse sections from remaining content
+        sections = parse_cv_sections('\n'.join(remaining_lines))
         
         # Rebuild CV with proper structure
         rebuilt_cv = []
         
-        # Personal info (first few lines)
-        if organized_sections['personal_info']:
-            rebuilt_cv.extend(organized_sections['personal_info'][:5])  # Name, contact info
+        # Always start with name and contact info
+        if name_and_contact:
+            rebuilt_cv.extend(name_and_contact)
             rebuilt_cv.append('')
         
-        # Profile Summary
-        if organized_sections['profile_summary']:
-            rebuilt_cv.append('_____________________________ PROFILE SUMMARY _____________________________')
-            rebuilt_cv.extend(organized_sections['profile_summary'])
-            rebuilt_cv.append('')
+        # Add sections in order
+        section_order = ['profile_summary', 'skills', 'experience', 'education', 'projects', 'certifications']
         
-        # Skills
-        if organized_sections['skills']:
-            rebuilt_cv.append('_____________________________ SKILLS _____________________________')
-            rebuilt_cv.extend(organized_sections['skills'])
-            rebuilt_cv.append('')
+        for section_name in section_order:
+            if section_name in sections:
+                section_info = sections[section_name]
+                start_line = section_info['start_line']
+                end_line = section_info['end_line']
+                
+                # Add section header
+                rebuilt_cv.append(section_info['header'])
+                
+                # Add section content
+                for j in range(start_line + 1, end_line + 1):
+                    if j < len(remaining_lines) and remaining_lines[j].strip():
+                        rebuilt_cv.append(remaining_lines[j])
+                
+                rebuilt_cv.append('')
         
-        # Work Experience
-        if organized_sections['experience']:
-            rebuilt_cv.append('_____________________________ WORK EXPERIENCE _____________________________')
-            rebuilt_cv.extend(organized_sections['experience'])
-            rebuilt_cv.append('')
-        
-        # Education
-        if organized_sections['education']:
-            rebuilt_cv.append('_____________________________ EDUCATION _____________________________')
-            rebuilt_cv.extend(organized_sections['education'])
-            rebuilt_cv.append('')
-        
-        # Projects
-        if organized_sections['projects']:
-            rebuilt_cv.append('_____________________________ PROJECTS _____________________________')
-            rebuilt_cv.extend(organized_sections['projects'])
-            rebuilt_cv.append('')
+        # Add any remaining sections not in the standard order
+        for section_name, section_info in sections.items():
+            if section_name not in section_order:
+                start_line = section_info['start_line']
+                end_line = section_info['end_line']
+                
+                # Add section header
+                rebuilt_cv.append(section_info['header'])
+                
+                # Add section content
+                for j in range(start_line + 1, end_line + 1):
+                    if j < len(remaining_lines) and remaining_lines[j].strip():
+                        rebuilt_cv.append(remaining_lines[j])
+                
+                rebuilt_cv.append('')
         
         result = '\n'.join(rebuilt_cv)
         
