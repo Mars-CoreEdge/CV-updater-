@@ -629,9 +629,10 @@ else:
 
 print(f"🔧 Allowed origins: {allowed_origins}")
 
+# Force CORS to allow all origins for immediate fix
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"],  # Allow all origins temporarily
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -4063,7 +4064,8 @@ async def test_endpoint():
                 "cvs_count": cv_count,
                 "timestamp": datetime.now().isoformat(),
                 "cors_origins": os.getenv("CORS_ORIGINS", "not_set"),
-                "allowed_origins": allowed_origins
+                "allowed_origins": allowed_origins,
+                "cors_fixed": "YES - All origins allowed"
             }
     except Exception as e:
         return {
@@ -4072,6 +4074,16 @@ async def test_endpoint():
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
+
+@app.get("/cors-test")
+async def cors_test():
+    """Simple CORS test endpoint"""
+    return {
+        "message": "CORS is working!",
+        "frontend_url": "https://cv-updater-dwj2.vercel.app",
+        "backend_url": "https://cv-updater-backend-version1.onrender.com",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.post("/test-download")
 async def test_download_endpoint(request: ProjectSelectionRequest):
