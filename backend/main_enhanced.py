@@ -616,10 +616,16 @@ load_dotenv()
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 print(f"🔧 CORS_ORIGINS from env: {cors_origins}")
 
-if cors_origins:
+# Temporary fix: Hardcode production CORS origins until Render environment variables are set
+if cors_origins and cors_origins != "http://localhost:3000,http://127.0.0.1:3000":
     allowed_origins = [origin.strip() for origin in cors_origins.split(",")]
 else:
-    allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Production CORS origins - this will work immediately
+    allowed_origins = [
+        "https://cv-updater-dwj2.vercel.app",
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000"
+    ]
 
 print(f"🔧 Allowed origins: {allowed_origins}")
 
