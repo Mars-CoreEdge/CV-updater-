@@ -332,19 +332,42 @@ def insert_content_in_section_enhanced(cv_content: str, section_name: str, new_c
             lines = lines[:start_line] + new_section_lines + lines[end_line:]
     else:
         # Section doesn't exist - create it
-        # Find a good position to insert (after profile/summary, before experience)
-        insert_position = len(lines)
-        
-        # Try to insert after profile/summary
-        profile_info = find_section_in_cv(cv_content, "profile")
-        if profile_info and profile_info['found']:
-            insert_position = profile_info['end_line']
-        else:
-            # Try to insert after first few lines (name, contact info)
-            for i in range(min(10, len(lines))):
-                if re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', lines[i].upper().strip()):
+        # Special handling for contact info
+        if section_name.lower() == 'contact':
+            # Check if contact info already exists in the CV content
+            cv_content_lower = cv_content.lower()
+            contact_indicators = ['@', 'phone:', 'email:', 'linkedin.com', 'github.com', 'gmail.com', 'outlook.com', 'yahoo.com']
+            if any(indicator in cv_content_lower for indicator in contact_indicators):
+                print(f"📝 Contact info already exists in CV content, skipping creation")
+                return cv_content
+            
+            # For contact info, insert after the first few lines (name and any existing contact info)
+            insert_position = 0
+            for i, line in enumerate(lines[:10]):  # Check first 10 lines
+                line_stripped = line.strip()
+                # If we find a section header or if we've passed the name/contact area
+                if (line_stripped and 
+                    (line_stripped.isupper() and len(line_stripped) > 3) or
+                    any(keyword in line_stripped.upper() for keyword in ['EDUCATION', 'EXPERIENCE', 'SKILLS', 'OBJECTIVE'])):
                     insert_position = i
                     break
+            # If we didn't find a section header, insert after first few lines
+            if insert_position == 0:
+                insert_position = min(5, len(lines))
+        else:
+            # For other sections, find a good position to insert (after profile/summary, before experience)
+            insert_position = len(lines)
+            
+            # Try to insert after profile/summary
+            profile_info = find_section_in_cv(cv_content, "profile")
+            if profile_info and profile_info['found']:
+                insert_position = profile_info['end_line']
+            else:
+                # Try to insert after first few lines (name, contact info)
+                for i in range(min(10, len(lines))):
+                    if re.match(r'^[_\-=\s]*[A-Z][A-Z\s&]+[_\-=\s]*$', lines[i].upper().strip()):
+                        insert_position = i
+                        break
         
         # Create section header
         section_header = f"___________________________ {section_name.upper()} ___________________________"
@@ -386,7 +409,7 @@ def generate_enhanced_pdf(cv_content: str) -> BytesIO:
             '\uf0b7': '-',  # another bullet
         }
         for uni, ascii_char in replacements.items():
-            cv_content = cv_content.replace(unicode_char, ascii_char)
+            cv_content = cv_content.replace(uni, ascii_char)
         # Also replace any other non-ASCII chars with '?'
         cv_content = cv_content.encode('ascii', errors='replace').decode('ascii')
 
@@ -586,9 +609,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Load environment variables
+load_dotenv()
+
+# Get CORS origins from environment or use default
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+if cors_origins:
+    allowed_origins = [origin.strip() for origin in cors_origins.split(",")]
+else:
+    allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for Vercel
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -3344,6 +3377,15 @@ def smart_section_integration(cv_content: str, section_type: str, new_content: L
                 target_section = section_name
                 break
         
+        # Special handling for contact info - also check if contact info exists in the content
+        if section_type == 'contact' and not target_section:
+            # Check if contact info already exists in the CV content
+            cv_content_lower = cv_content.lower()
+            contact_indicators = ['@', 'phone:', 'email:', 'linkedin.com', 'github.com', 'gmail.com', 'outlook.com', 'yahoo.com']
+            if any(indicator in cv_content_lower for indicator in contact_indicators):
+                print(f"📝 Contact info already exists in CV content, skipping creation")
+                return cv_content
+        
         if target_section:
             # APPEND to existing section
             section_info = sections[target_section]
@@ -3386,21 +3428,43 @@ def smart_section_integration(cv_content: str, section_type: str, new_content: L
             full_content = [f"\n{header}"] + new_content + [""]
             
             # Determine best insertion point based on standard CV order
-            cv_order = ['objective', 'skills', 'experience', 'education', 'projects', 'certifications', 'research', 'achievements', 'leadership', 'volunteer', 'languages', 'technologies', 'interests', 'references', 'additional', 'contact']
-            current_index = cv_order.index(section_type) if section_type in cv_order else len(cv_order)
-            
-            # Find insertion point based on existing sections
-            insert_pos = len(cv_lines)
-            
-            # Look for next section in order
-            for i in range(current_index + 1, len(cv_order)):
-                next_section_type = cv_order[i]
-                for section_name in sections.keys():
-                    if next_section_type in section_name.lower():
-                        insert_pos = sections[section_name]['start_line']
+            # Contact info should be near the top, after name but before other sections
+            if section_type == 'contact':
+                # For contact info, insert after the first few lines (name and any existing contact info)
+                insert_pos = 0
+                for i, line in enumerate(cv_lines[:10]):  # Check first 10 lines
+                    line_stripped = line.strip()
+                    # If we find a section header or if we've passed the name/contact area
+                    if (line_stripped and 
+                        (line_stripped.isupper() and len(line_stripped) > 3) or
+                        any(keyword in line_stripped.upper() for keyword in ['EDUCATION', 'EXPERIENCE', 'SKILLS', 'OBJECTIVE'])):
+                        insert_pos = i
                         break
-                if insert_pos < len(cv_lines):
-                    break
+                    # If we find existing contact info, don't add more
+                    if any(contact_indicator in line_stripped.lower() for contact_indicator in ['@', 'phone:', 'email:', 'linkedin.com', 'github.com']):
+                        # Contact info already exists, don't create new section
+                        print(f"📝 Contact info already exists, skipping creation")
+                        return cv_content
+                # If we didn't find a section header, insert after first few lines
+                if insert_pos == 0:
+                    insert_pos = min(5, len(cv_lines))
+            else:
+                # For other sections, use standard CV order
+                cv_order = ['objective', 'skills', 'experience', 'education', 'projects', 'certifications', 'research', 'achievements', 'leadership', 'volunteer', 'languages', 'technologies', 'interests', 'references', 'additional']
+                current_index = cv_order.index(section_type) if section_type in cv_order else len(cv_order)
+                
+                # Find insertion point based on existing sections
+                insert_pos = len(cv_lines)
+                
+                # Look for next section in order
+                for i in range(current_index + 1, len(cv_order)):
+                    next_section_type = cv_order[i]
+                    for section_name in sections.keys():
+                        if next_section_type in section_name.lower():
+                            insert_pos = sections[section_name]['start_line']
+                            break
+                    if insert_pos < len(cv_lines):
+                        break
             
             # Insert new section
             for i, line in enumerate(reversed(full_content)):
@@ -3461,6 +3525,10 @@ def _generate_cv_with_projects_internal(cursor, conn) -> str:
         except:
             pass
     
+    # Parse CV sections first
+    sections = parse_cv_sections(original_cv)
+    cv_lines = original_cv.split('\n')
+    
     # If no manually added projects, remove any existing projects section and return original CV
     if not new_projects:
         # Clean up any existing projects section
@@ -3471,10 +3539,6 @@ def _generate_cv_with_projects_internal(cursor, conn) -> str:
             del cv_lines[start_line:end_line + 1]
             return '\n'.join(cv_lines)
         return original_cv
-    
-    # Parse CV sections
-    sections = parse_cv_sections(original_cv)
-    cv_lines = original_cv.split('\n')
     
     # Only use manually added projects (no extraction from CV content)
     all_projects = new_projects.copy()

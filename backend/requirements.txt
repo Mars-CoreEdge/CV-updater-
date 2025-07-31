@@ -2,13 +2,12 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 PyPDF2==3.0.1
-python-docx2txt==0.8
+docx2txt==0.8
 python-dotenv==1.0.0
 openai==1.3.7
 requests==2.31.0
 fpdf2==2.7.6
 psycopg2-binary==2.9.9
-sqlite3
 pymupdf==1.23.8
 pdfplumber==0.10.3
 pytesseract==0.3.10
