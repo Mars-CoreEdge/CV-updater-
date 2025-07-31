@@ -614,10 +614,14 @@ load_dotenv()
 
 # Get CORS origins from environment or use default
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+print(f"🔧 CORS_ORIGINS from env: {cors_origins}")
+
 if cors_origins:
     allowed_origins = [origin.strip() for origin in cors_origins.split(",")]
 else:
     allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+print(f"🔧 Allowed origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -4051,7 +4055,9 @@ async def test_endpoint():
                 "database": "connected",
                 "projects_count": project_count,
                 "cvs_count": cv_count,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "cors_origins": os.getenv("CORS_ORIGINS", "not_set"),
+                "allowed_origins": allowed_origins
             }
     except Exception as e:
         return {
