@@ -1,0 +1,80 @@
+ALEXANDER SMITH
+📍 New York, USA   |   📞 +1 (555) 123-4567   |   ✉️ alex.smith@email.com
+🌐 linkedin.com/in/alexsmith | github.com/alexsmithdev
+
+🧑‍💼 Professional Summary
+Full-stack web developer with 4+ years of experience in designing, developing, and deploying scalable web applications. Strong expertise in JavaScript, React, Node.js, and PostgreSQL. Passionate about building user-centric products and collaborating with cross-functional teams to solve real-world problems.
+
+💼 Work Experience
+Software Engineer
+TechNova Solutions – Remote
+June 2021 – Present
+
+Built and maintained scalable web applications using React, Next.js, and Express.js.
+
+Designed RESTful APIs and integrated third-party services like Stripe and Auth0.
+
+Improved page load speed by 40% through code-splitting and optimized rendering.
+
+Mentored junior developers and led weekly code reviews.
+
+Frontend Developer
+PixelForge Studio – New York, USA
+Aug 2019 – May 2021
+
+Developed interactive UI components in React and Redux.
+
+Collaborated with UX designers to implement pixel-perfect interfaces.
+
+Integrated real-time features using Socket.IO and Firebase.
+
+Helped migrate the codebase from jQuery to modern React architecture.
+
+🎓 Education
+B.S. in Computer Science
+Columbia University – New York, USA
+2015 – 2019
+
+GPA: 3.8/4.0
+
+Relevant Coursework: Data Structures, Web Development, Database Systems
+
+💻 Projects
+DevConnect
+Social platform for developers to share portfolios and collaborate.
+
+Built with React, Node.js, and Supabase
+
+Implemented authentication, real-time messaging, and post feed
+
+GitHub: github.com/alexsmithdev/devconnect
+
+Taskify
+A lightweight task manager with drag-and-drop functionality.
+
+Built using Vue.js and Firebase
+
+Supports real-time collaboration and offline sync
+
+Deployed with Vercel
+
+🛠️ Technical Skills
+Languages: JavaScript, TypeScript, Python, SQL
+
+Frontend: React, Next.js, Redux, Tailwind CSS
+
+Backend: Node.js, Express, Supabase, Firebase
+
+Database: PostgreSQL, MongoDB
+
+Tools: Git, Docker, Postman, Figma
+
+🗣️ Languages
+English – Native
+
+Spanish – Conversational
+
+🏆 Certifications
+AWS Certified Developer – Associate
+
+Meta Front-End Developer Certificate (Coursera)

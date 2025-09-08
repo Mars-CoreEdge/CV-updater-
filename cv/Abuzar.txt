@@ -1,0 +1,81 @@
+Abuzar Asif
+📍 Lahore, Pakistan
+📞 +92 300 0000000
+📧 abuzar.asif@example.com
+🌐 linkedin.com/in/abuzarasif | github.com/abuzarasif
+
+Professional Summary
+Motivated and detail-oriented software engineer with 3+ years of experience in full-stack web development. Passionate about writing clean, efficient code and building scalable software solutions. Strong background in JavaScript, React, and Node.js, with a deep understanding of REST APIs and modern development practices.
+
+Skills
+Languages: JavaScript, TypeScript, Python, Java
+
+Frontend: React.js, HTML5, CSS3, Bootstrap, Tailwind CSS
+
+Backend: Node.js, Express.js, Django
+
+Databases: MongoDB, PostgreSQL, MySQL
+
+Tools & Platforms: Git, Docker, REST APIs, Postman, AWS
+
+Soft Skills: Team collaboration, Problem-solving, Time management
+
+Professional Experience
+Software Engineer
+TechNova Solutions – Lahore, Pakistan
+July 2022 – Present
+
+Developed and maintained full-stack web applications using React and Node.js.
+
+Integrated third-party APIs and implemented secure user authentication using JWT.
+
+Optimized front-end performance, improving load times by 30%.
+
+Collaborated with designers and QA to ensure responsive and bug-free user interfaces.
+
+Junior Developer
+CodeSoft Technologies – Remote
+Jan 2021 – June 2022
+
+Assisted in developing internal tools for client management and data analysis.
+
+Built RESTful APIs in Express.js and connected frontends using Axios.
+
+Wrote unit tests and participated in regular code reviews.
+
+Education
+Bachelor of Science in Computer Science
+University of the Punjab, Lahore
+Graduated: 2020
+
+Final Year Project: "AI-based Job Recommendation System"
+
+Projects
+Inventory Manager Web App
+Built a MERN stack app to help small businesses track inventory and generate reports.
+
+Features included role-based access, stock alerts, and PDF export functionality.
+
+Weather Forecast App
+Created a weather dashboard using React and OpenWeatherMap API.
+
+Implemented dynamic search and geolocation-based results.
+
+Certifications
+JavaScript Algorithms and Data Structures – freeCodeCamp
+
+AWS Fundamentals – Coursera
+
+Languages
+English – Fluent
+
+Urdu – Native
+
+Interests
+Open-source contributions
+
+Tech blogging
+
+UI/UX design
+
+Football and hiking

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -686,6 +686,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdateCheck, setLastUpdateCheck] = useState(Date.now());
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -694,7 +695,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
     }
   }, [cvUploaded]);
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/chat/history/`);
       const chatHistory = response.data || [];
@@ -710,9 +711,9 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
     } catch (error) {
       console.error('Error loading chat history:', error);
     }
-  };
+  }, []);
 
-  const detectCrudOperation = (userMessage, aiResponse) => {
+  const detectCrudOperation = useCallback((userMessage, aiResponse) => {
     const msg = userMessage.toLowerCase();
     const response = aiResponse.toLowerCase();
     
@@ -743,9 +744,15 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
     }
     
     return null;
-  };
+  }, []);
 
-  const handleSendMessage = async (messageText = null) => {
+  const cvUpdateKeywords = useMemo(() => [
+    'updated', 'generated', 'enhanced', 'added', 'included', 'saved', 
+    'recorded', 'noted', 'successfully', 'cv', 'section', 'skill', 
+    'experience', 'education', 'project', 'automatically updated', 'removed', 'deleted'
+  ], []);
+
+  const handleSendMessage = useCallback(async (messageText = null) => {
     const userMessage = messageText || inputValue.trim();
     if (!userMessage || isLoading) return;
 
@@ -785,12 +792,6 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
       setMessages(prev => [...prev, aiMsgObj]);
 
       // Trigger CV refresh if the response indicates CV updates (enhanced detection)
-      const cvUpdateKeywords = [
-        'updated', 'generated', 'enhanced', 'added', 'included', 'saved', 
-        'recorded', 'noted', 'successfully', 'cv', 'section', 'skill', 
-        'experience', 'education', 'project', 'automatically updated', 'removed', 'deleted'
-      ];
-      
       const shouldRefresh = cvUpdateKeywords.some(keyword => 
         aiResponse.toLowerCase().includes(keyword.toLowerCase())
       ) || userMessage.toLowerCase().includes('learn') || 
@@ -824,16 +825,51 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
       setMessages(prev => [...prev, errorMsgObj]);
     } finally {
       setIsLoading(false);
+      // Focus back to input after sending
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
-  };
+  }, [inputValue, isLoading, detectCrudOperation, cvUpdateKeywords, onCVUpdate]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]);
+  }, [messages, isLoading, scrollToBottom]);
+
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }, [handleSendMessage]);
+
+  const handleManualCVRefresh = useCallback(() => {
+    console.log('🔄 Manual CV refresh triggered by user');
+    if (onCVUpdate) {
+      onCVUpdate(true);
+      setLastUpdateCheck(Date.now());
+    }
+  }, [onCVUpdate]);
+
+  const formatTime = useCallback((date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }, []);
+
+  const handleInputChange = useCallback((e) => {
+    setInputValue(e.target.value);
+  }, []);
+
+  const handleSendClick = useCallback(() => {
+    handleSendMessage();
+  }, [handleSendMessage]);
+
+  const handleGenerateCV = useCallback(() => {
+    handleSendMessage('generate cv');
+  }, [handleSendMessage]);
 
   // Quick actions suggestions - commented out as requested
   /*
@@ -853,25 +889,6 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
   ];
   */
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const handleManualCVRefresh = () => {
-    console.log('🔄 Manual CV refresh triggered by user');
-    if (onCVUpdate) {
-      onCVUpdate(true);
-      setLastUpdateCheck(Date.now());
-    }
-  };
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
   return (
     <ChatContainer>
       <Title>
@@ -882,7 +899,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
       {cvUploaded && (
         <>
           <GenerateCVButton 
-            onClick={() => handleSendMessage('generate cv')}
+            onClick={handleGenerateCV}
             disabled={isLoading}
           >
             <div className="button-content">
@@ -1000,9 +1017,10 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
       <InputContainer>
         <InputWrapper>
           <Input
+            ref={inputRef}
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder="Ask about your CV, add new information, or say 'generate CV'..."
             disabled={!cvUploaded || isLoading}
@@ -1010,7 +1028,7 @@ function ChatInterface({ cvUploaded, onCVUpdate }) {
           <InputIcon>💭</InputIcon>
         </InputWrapper>
         <SendButton
-          onClick={() => handleSendMessage()}
+          onClick={handleSendClick}
           disabled={!cvUploaded || !inputValue.trim() || isLoading}
         >
           <div className="button-content">

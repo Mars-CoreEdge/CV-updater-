@@ -36,11 +36,13 @@ SECTION_PATTERNS = {
         r"^CONTACT\s+INFORMATION$", r"^CONTACT\s+DETAILS$", r"^PERSONAL\s+INFORMATION$", r"^PROFILE$", r"^BIO$", r"^SUMMARY$",
         r"^PERSONAL\s+SUMMARY$", r"^ABOUT\s+ME$", r"^PERSONAL\s+PROFILE$", r"^CANDIDATE\s+PROFILE$", r"^CAREER\s+OVERVIEW$",
         r"^EXECUTIVE\s+SUMMARY$", r"^CAREER\s+PROFILE$", r"^SNAPSHOT$", r"^RESUME\s+SUMMARY$", r"^STATEMENT\s+OF\s+PURPOSE$",
+        r"^PROFESSIONAL\s+SUMMARY$",
         r"^[_\-=\s]*CONTACT\s+INFORMATION[_\-=\s]*$", r"^[_\-=\s]*CONTACT\s+DETAILS[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+INFORMATION[_\-=\s]*$",
         r"^[_\-=\s]*PROFILE[_\-=\s]*$", r"^[_\-=\s]*BIO[_\-=\s]*$", r"^[_\-=\s]*SUMMARY[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+SUMMARY[_\-=\s]*$",
         r"^[_\-=\s]*ABOUT\s+ME[_\-=\s]*$", r"^[_\-=\s]*PERSONAL\s+PROFILE[_\-=\s]*$", r"^[_\-=\s]*CANDIDATE\s+PROFILE[_\-=\s]*$",
         r"^[_\-=\s]*CAREER\s+OVERVIEW[_\-=\s]*$", r"^[_\-=\s]*EXECUTIVE\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*CAREER\s+PROFILE[_\-=\s]*$",
-        r"^[_\-=\s]*SNAPSHOT[_\-=\s]*$", r"^[_\-=\s]*RESUME\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*STATEMENT\s+OF\s+PURPOSE[_\-=\s]*$"
+        r"^[_\-=\s]*SNAPSHOT[_\-=\s]*$", r"^[_\-=\s]*RESUME\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*STATEMENT\s+OF\s+PURPOSE[_\-=\s]*$",
+        r"^[_\-=\s]*PROFESSIONAL\s+SUMMARY[_\-=\s]*$"
     ],
     
     # Objective / Goal
@@ -81,11 +83,13 @@ SECTION_PATTERNS = {
         r"^SKILLS$", r"^TECHNICAL\s+SKILLS$", r"^HARD\s+SKILLS$", r"^SOFT\s+SKILLS$", r"^CORE\s+SKILLS$", r"^KEY\s+SKILLS$",
         r"^TRANSFERABLE\s+SKILLS$", r"^FUNCTIONAL\s+SKILLS$", r"^COMPETENCIES$", r"^AREAS\s+OF\s+EXPERTISE$",
         r"^AREAS\s+OF\s+KNOWLEDGE$", r"^SKILL\s+HIGHLIGHTS$", r"^SKILLS\s+SUMMARY$", r"^LANGUAGE\s+SKILLS$", r"^IT\s+SKILLS$",
+        r"^LANGUAGES\s*&\s*TECHNOLOGIES$", r"^LANGUAGES\s+AND\s+TECHNOLOGIES$", r"^TECHNOLOGIES\s*&\s*LANGUAGES$",
         r"^[_\-=\s]*SKILLS[_\-=\s]*$", r"^[_\-=\s]*TECHNICAL\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*HARD\s+SKILLS[_\-=\s]*$",
         r"^[_\-=\s]*SOFT\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*CORE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*KEY\s+SKILLS[_\-=\s]*$",
         r"^[_\-=\s]*TRANSFERABLE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*FUNCTIONAL\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*COMPETENCIES[_\-=\s]*$",
         r"^[_\-=\s]*AREAS\s+OF\s+EXPERTISE[_\-=\s]*$", r"^[_\-=\s]*AREAS\s+OF\s+KNOWLEDGE[_\-=\s]*$", r"^[_\-=\s]*SKILL\s+HIGHLIGHTS[_\-=\s]*$",
-        r"^[_\-=\s]*SKILLS\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*LANGUAGE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*IT\s+SKILLS[_\-=\s]*$"
+        r"^[_\-=\s]*SKILLS\s+SUMMARY[_\-=\s]*$", r"^[_\-=\s]*LANGUAGE\s+SKILLS[_\-=\s]*$", r"^[_\-=\s]*IT\s+SKILLS[_\-=\s]*$",
+        r"^[_\-=\s]*LANGUAGES\s*&\s*TECHNOLOGIES[_\-=\s]*$", r"^[_\-=\s]*LANGUAGES\s+AND\s+TECHNOLOGIES[_\-=\s]*$", r"^[_\-=\s]*TECHNOLOGIES\s*&\s*LANGUAGES[_\-=\s]*$"
     ],
     
     # Certifications & Training
@@ -103,11 +107,11 @@ SECTION_PATTERNS = {
     "projects": [
         r"^PROJECTS$", r"^KEY\s+PROJECTS$", r"^PROJECT\s+PORTFOLIO$", r"^MAJOR\s+PROJECTS$", r"^TECHNICAL\s+PROJECTS$",
         r"^CLIENT\s+PROJECTS$", r"^NOTABLE\s+PROJECTS$", r"^FREELANCE\s+PROJECTS$", r"^PROJECT\s+HIGHLIGHTS$",
-        r"^RESEARCH\s+PROJECTS$", r"^CAPSTONE\s+PROJECT$",
+        r"^RESEARCH\s+PROJECTS$", r"^CAPSTONE\s+PROJECT$", r"^SOLO\s+PROJECTS$",
         r"^[_\-=\s]*PROJECTS[_\-=\s]*$", r"^[_\-=\s]*KEY\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*PROJECT\s+PORTFOLIO[_\-=\s]*$",
         r"^[_\-=\s]*MAJOR\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*TECHNICAL\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*CLIENT\s+PROJECTS[_\-=\s]*$",
         r"^[_\-=\s]*NOTABLE\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*FREELANCE\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*PROJECT\s+HIGHLIGHTS[_\-=\s]*$",
-        r"^[_\-=\s]*RESEARCH\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*CAPSTONE\s+PROJECT[_\-=\s]*$"
+        r"^[_\-=\s]*RESEARCH\s+PROJECTS[_\-=\s]*$", r"^[_\-=\s]*CAPSTONE\s+PROJECT[_\-=\s]*$", r"^[_\-=\s]*SOLO\s+PROJECTS[_\-=\s]*$"
     ],
     
     # Research & Academic Work
@@ -141,6 +145,15 @@ SECTION_PATTERNS = {
         r"^[_\-=\s]*LEADERSHIP\s+EXPERIENCE[_\-=\s]*$", r"^[_\-=\s]*LEADERSHIP\s+ROLES[_\-=\s]*$", r"^[_\-=\s]*ACTIVITIES[_\-=\s]*$",
         r"^[_\-=\s]*STUDENT\s+ACTIVITIES[_\-=\s]*$", r"^[_\-=\s]*CAMPUS\s+INVOLVEMENT[_\-=\s]*$", r"^[_\-=\s]*PROFESSIONAL\s+ACTIVITIES[_\-=\s]*$",
         r"^[_\-=\s]*ORGANIZATIONAL\s+INVOLVEMENT[_\-=\s]*$", r"^[_\-=\s]*LEADERSHIP\s+&\s+INVOLVEMENT[_\-=\s]*$"
+    ],
+    
+    # Extracurricular Activities
+    "extracurriculars": [
+        r"^EXTRACURRICULARS$", r"^EXTRACURRICULAR\s+ACTIVITIES$", r"^ACTIVITIES\s+AND\s+LEADERSHIP$", r"^ACTIVITIES\s+&\s+LEADERSHIP$",
+        r"^LEADERSHIP\s+ACTIVITIES$", r"^STUDENT\s+ACTIVITIES$", r"^CAMPUS\s+ACTIVITIES$", r"^CLUB\s+ACTIVITIES$",
+        r"^[_\-=\s]*EXTRACURRICULARS[_\-=\s]*$", r"^[_\-=\s]*EXTRACURRICULAR\s+ACTIVITIES[_\-=\s]*$", r"^[_\-=\s]*ACTIVITIES\s+AND\s+LEADERSHIP[_\-=\s]*$",
+        r"^[_\-=\s]*ACTIVITIES\s+&\s+LEADERSHIP[_\-=\s]*$", r"^[_\-=\s]*LEADERSHIP\s+ACTIVITIES[_\-=\s]*$", r"^[_\-=\s]*STUDENT\s+ACTIVITIES[_\-=\s]*$",
+        r"^[_\-=\s]*CAMPUS\s+ACTIVITIES[_\-=\s]*$", r"^[_\-=\s]*CLUB\s+ACTIVITIES[_\-=\s]*$"
     ],
     
     # Volunteer / Community Involvement
@@ -2865,6 +2878,7 @@ def extract_intelligent_content(message: str) -> tuple[str, str]:
         "research": ["research", "publication", "paper", "thesis", "dissertation", "study", "academic"],
         "achievements": ["achievement", "award", "recognition", "honor", "accomplishment", "success", "milestone", "scholarship"],
         "leadership": ["leadership", "led", "managed", "supervised", "directed", "team lead", "manager"],
+        "extracurriculars": ["extracurricular", "activities", "club", "student", "campus", "president", "vice president", "volunteered", "volunteer"],
         "volunteer": ["volunteer", "community service", "charity", "pro bono", "community work"],
         "languages": ["language", "speak", "fluent", "conversational", "native", "bilingual", "proficient in"],
         "technologies": ["tool", "software", "platform", "system", "technology", "technologies", "git", "docker", "jenkins", "jira", "confluence", "slack", "proficient with", "skilled in"],
@@ -2879,8 +2893,45 @@ def extract_intelligent_content(message: str) -> tuple[str, str]:
         score = sum(1 for keyword in keywords if keyword in message_lower)
         section_scores[section] = score
     
-    # Find the section with highest score
-    detected_section = max(section_scores.items(), key=lambda x: x[1])[0] if section_scores else "skills"
+    # Priority logic for specific cases
+    # Check for specific patterns that should override general detection
+    
+    # 1. "led a team" should go to experience, not leadership
+    if "led a team" in message_lower or "led team" in message_lower:
+        detected_section = "experience"
+    # 2. "bilingual" should go to languages, not skills
+    elif "bilingual" in message_lower:
+        detected_section = "languages"
+    # 3. "president of" should go to extracurriculars, not leadership
+    elif "president of" in message_lower or "vice president of" in message_lower:
+        detected_section = "extracurriculars"
+    # 4. "volunteered" should go to extracurriculars, not volunteer
+    elif "volunteered" in message_lower or "volunteer" in message_lower:
+        detected_section = "extracurriculars"
+    # 5. "worked as" or "was a" should go to experience
+    elif any(phrase in message_lower for phrase in ["worked as", "was a", "employed as"]):
+        detected_section = "experience"
+    # 6. "speak" or "fluent" should go to languages
+    elif any(word in message_lower for word in ["speak", "fluent", "conversational", "native"]):
+        detected_section = "languages"
+    # 7. "won" or "received award" should go to achievements
+    elif any(word in message_lower for word in ["won", "received", "award", "recognition"]):
+        detected_section = "achievements"
+    # 8. "completed course" or "certification" should go to certifications
+    elif any(word in message_lower for word in ["completed", "certification", "certified"]):
+        detected_section = "certifications"
+    # 9. "studied" or "graduated" should go to education
+    elif any(word in message_lower for word in ["studied", "graduated", "degree", "university", "college"]):
+        detected_section = "education"
+    # 10. "built" or "created" should go to projects
+    elif any(word in message_lower for word in ["built", "created", "developed", "project"]):
+        detected_section = "projects"
+    # 11. "know" or "learned" should go to skills
+    elif any(word in message_lower for word in ["know", "learned", "proficient", "skilled"]):
+        detected_section = "skills"
+    # Default to highest score
+    else:
+        detected_section = max(section_scores.items(), key=lambda x: x[1])[0] if section_scores else "skills"
     
     # If no clear section detected, try to infer from content patterns
     if section_scores[detected_section] == 0:
@@ -3198,6 +3249,7 @@ def read_cv_section(cv_content: str, section_type: str) -> str:
                 'research': ['research', 'publication', 'paper', 'thesis', 'dissertation', 'study'],
                 'achievements': ['achievement', 'award', 'honor', 'recognition', 'scholarship'],
                 'leadership': ['leadership', 'led', 'managed', 'supervised', 'directed'],
+                'extracurriculars': ['extracurricular', 'activities', 'club', 'student', 'campus', 'president', 'vice president'],
                 'volunteer': ['volunteer', 'community', 'charity', 'service', 'pro bono'],
                 'languages': ['language', 'speak', 'fluent', 'proficient', 'bilingual'],
                 'technologies': ['tool', 'software', 'platform', 'system', 'technology'],
@@ -3736,6 +3788,16 @@ def extract_section_from_cv(cv_content: str, section_name: str) -> str:
             r'[_\-\s]*SUPERVISION[_\-\s]*',
             r'[_\-\s]*DIRECTION[_\-\s]*'
         ],
+        'extracurriculars': [
+            r'[_\-\s]*EXTRACURRICULARS[_\-\s]*',
+            r'[_\-\s]*EXTRACURRICULAR\s+ACTIVITIES[_\-\s]*',
+            r'[_\-\s]*ACTIVITIES\s+AND\s+LEADERSHIP[_\-\s]*',
+            r'[_\-\s]*ACTIVITIES\s+&\s+LEADERSHIP[_\-\s]*',
+            r'[_\-\s]*LEADERSHIP\s+ACTIVITIES[_\-\s]*',
+            r'[_\-\s]*STUDENT\s+ACTIVITIES[_\-\s]*',
+            r'[_\-\s]*CAMPUS\s+ACTIVITIES[_\-\s]*',
+            r'[_\-\s]*CLUB\s+ACTIVITIES[_\-\s]*'
+        ],
         'volunteer': [
             r'[_\-\s]*VOLUNTEER[_\-\s]*',
             r'[_\-\s]*VOLUNTEER\s+WORK[_\-\s]*',
@@ -3849,6 +3911,13 @@ def parse_cv_sections(cv_content: str) -> dict:
             r'^\s*LEADERSHIP\s*$', r'^\s*MANAGEMENT\s*$', r'^\s*TEAM\s+LEADERSHIP\s*$',
             r'^\s*SUPERVISION\s*$', r'^\s*DIRECTION\s*$',
             r'^\s*_+\s*LEADERSHIP\s*_+\s*$'
+        ],
+        'extracurriculars': [
+            r'^\s*EXTRACURRICULARS\s*$', r'^\s*EXTRACURRICULAR\s+ACTIVITIES\s*$',
+            r'^\s*ACTIVITIES\s+AND\s+LEADERSHIP\s*$', r'^\s*ACTIVITIES\s+&\s+LEADERSHIP\s*$',
+            r'^\s*LEADERSHIP\s+ACTIVITIES\s*$', r'^\s*STUDENT\s+ACTIVITIES\s*$',
+            r'^\s*CAMPUS\s+ACTIVITIES\s*$', r'^\s*CLUB\s+ACTIVITIES\s*$',
+            r'^\s*_+\s*EXTRACURRICULARS\s*_+\s*$'
         ],
         'volunteer': [
             r'^\s*VOLUNTEER\s*$', r'^\s*VOLUNTEER\s+WORK\s*$', r'^\s*COMMUNITY\s+SERVICE\s*$',
@@ -4294,11 +4363,62 @@ async def chat(request: ChatRequest):
                 cv_content = None
                 print("⚠️ No active CV found in database")
             
-            classification = classify_message(request.message, cv_content)
-            category = classification.get("category", "OTHER")
-            extracted_info = classification.get("extracted_info")
-            operation = classification.get("operation", "READ")
-            target_item = classification.get("target_item", "")
+            # Use intelligent detection first for specific cases
+            extracted_content, detected_section = extract_intelligent_content(request.message)
+            
+            # Check if this is a case where we should bypass classification
+            bypass_classification = False
+            # More comprehensive pattern matching
+            message_lower = request.message.lower()
+            bypass_patterns = [
+                "led a team", "led team", "bilingual", "president of", "vice president of", 
+                "volunteered", "volunteer", "worked as", "was a", "speak", "fluent", 
+                "conversational", "native", "won", "received", "award", "completed", 
+                "certification", "certified", "studied", "graduated", "degree", 
+                "university", "college", "built", "created", "developed", "project",
+                "know", "learned", "proficient", "skilled", "first place", "competition",
+                "won first", "coding competition", "president", "volunteer"
+            ]
+            
+            # Debug: Check which patterns match
+            matching_patterns = [pattern for pattern in bypass_patterns if pattern in message_lower]
+            
+            if matching_patterns:
+                bypass_classification = True
+                print(f"[DEBUG] BYPASS TRIGGERED for: '{request.message}'")
+                print(f"[DEBUG] Matching patterns: {matching_patterns}")
+            else:
+                print(f"[DEBUG] NO BYPASS for: '{request.message}'")
+                print(f"[DEBUG] No patterns matched from: {bypass_patterns}")
+            
+            if bypass_classification:
+                # Map detected section to category
+                section_to_category = {
+                    "experience": "EXPERIENCE_ADD",
+                    "languages": "LANGUAGE_ADD", 
+                    "extracurriculars": "LEADERSHIP_ADD",  # Map to leadership since extracurriculars go there
+                    "achievements": "ACHIEVEMENT_ADD",
+                    "certifications": "CERTIFICATION_ADD",
+                    "education": "EDUCATION_ADD",
+                    "projects": "PROJECT_ADD",
+                    "skills": "SKILL_ADD",
+                    "volunteer": "VOLUNTEER_ADD"
+                }
+                category = section_to_category.get(detected_section, "OTHER")
+                operation = "CREATE"
+                extracted_info = extracted_content
+                target_item = ""
+                print(f"[DEBUG] BYPASSING CLASSIFICATION for: {request.message}")
+                print(f"[DEBUG] Detected section: {detected_section}, Category: {category}")
+            else:
+                # Use normal classification
+                classification = classify_message(request.message, cv_content)
+                category = classification.get("category", "OTHER")
+                extracted_info = classification.get("extracted_info")
+                operation = classification.get("operation", "READ")
+                target_item = classification.get("target_item", "")
+                print(f"[DEBUG] USING NORMAL CLASSIFICATION for: {request.message}")
+                print(f"[DEBUG] Category: {category}")
             
             response_text = ""
             cv_updated = False
@@ -4312,30 +4432,47 @@ async def chat(request: ChatRequest):
                              "OBJECTIVE_ADD", "CERTIFICATION_ADD", "RESEARCH_ADD", "ACHIEVEMENT_ADD", "LEADERSHIP_ADD", 
                              "VOLUNTEER_ADD", "LANGUAGE_ADD", "TECHNOLOGY_ADD", "INTEREST_ADD", "REFERENCE_ADD", "ADDITIONAL_ADD"]:
                 if cv_content:
-                    # Use intelligent content extraction to get main content and auto-detect section
-                    extracted_content, detected_section = extract_intelligent_content(request.message)
-                    
-                    # Override detected section with explicit category if available
-                    section_map = {
-                        "SKILL_ADD": "skills",
-                        "EXPERIENCE_ADD": "experience", 
-                        "EDUCATION_ADD": "education",
-                        "PROJECT_ADD": "projects",
-                        "PROFILE_ADD": "profile",
-                        "CONTACT_ADD": "contact",
-                        "OBJECTIVE_ADD": "objective",
-                        "CERTIFICATION_ADD": "certifications",
-                        "RESEARCH_ADD": "research",
-                        "ACHIEVEMENT_ADD": "achievements",
-                        "LEADERSHIP_ADD": "leadership",
-                        "VOLUNTEER_ADD": "volunteer",
-                        "LANGUAGE_ADD": "languages",
-                        "TECHNOLOGY_ADD": "technologies",
-                        "INTEREST_ADD": "interests",
-                        "REFERENCE_ADD": "references",
-                        "ADDITIONAL_ADD": "additional"
-                    }
-                    section_type = section_map.get(category, detected_section)
+                    # Use intelligent content extraction if we bypassed classification, otherwise re-extract
+                    if bypass_classification:
+                        # We already have the intelligent detection results
+                        # For bypass cases, map detected_section to actual CV section names
+                        section_mapping = {
+                            "extracurriculars": "leadership",  # Map extracurriculars to leadership section
+                            "volunteer": "volunteer",
+                            "achievements": "achievements",
+                            "experience": "experience",
+                            "languages": "languages",
+                            "skills": "skills",
+                            "education": "education",
+                            "projects": "projects",
+                            "certifications": "certifications"
+                        }
+                        section_type = section_mapping.get(detected_section, detected_section)
+                    else:
+                        # Use intelligent content extraction to get main content and auto-detect section
+                        extracted_content, detected_section = extract_intelligent_content(request.message)
+                        
+                        # Override detected section with explicit category if available
+                        section_map = {
+                            "SKILL_ADD": "skills",
+                            "EXPERIENCE_ADD": "experience", 
+                            "EDUCATION_ADD": "education",
+                            "PROJECT_ADD": "projects",
+                            "PROFILE_ADD": "profile",
+                            "CONTACT_ADD": "contact",
+                            "OBJECTIVE_ADD": "objective",
+                            "CERTIFICATION_ADD": "certifications",
+                            "RESEARCH_ADD": "research",
+                            "ACHIEVEMENT_ADD": "achievements",
+                            "LEADERSHIP_ADD": "leadership",
+                            "VOLUNTEER_ADD": "volunteer",
+                            "LANGUAGE_ADD": "languages",
+                            "TECHNOLOGY_ADD": "technologies",
+                            "INTEREST_ADD": "interests",
+                            "REFERENCE_ADD": "references",
+                            "ADDITIONAL_ADD": "additional"
+                        }
+                        section_type = section_map.get(category, detected_section)
                     
                     print(f"[DIAG] Incoming {category}. Original message: {request.message}")
                     print(f"[DIAG] Extracted content: {extracted_content}")
@@ -4350,9 +4487,13 @@ async def chat(request: ChatRequest):
                         cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
                         cv_updated = True
                         print(f"[DIAG] DB updated with new {section_type} section.")
-                        # Extract and return the updated section
-                        updated_section = extract_section_from_cv(updated_cv, section_type)
-                        response_text = f"✅ Added '{extracted_content}' to {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
+                        # Extract and return the updated section using the same function as insertion
+                        section_info = find_section_in_cv(updated_cv, section_type)
+                        if section_info and section_info.get('found'):
+                            updated_section = section_info['content']
+                            response_text = f"✅ Added '{extracted_content}' to {section_type} section! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
+                        else:
+                            response_text = f"✅ Added '{extracted_content}' to {section_type} section! Your CV has been updated."
                     else:
                         print(f"[DIAG] No changes made to {section_type} section.")
                         response_text = f"⚠️ No changes made to your {section_type} section."
@@ -4450,8 +4591,13 @@ async def chat(request: ChatRequest):
                         cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
                         cv_updated = True
                         print(f"[DIAG] DB updated with new {section_type} section.")
-                        updated_section = extract_section_from_cv(updated_cv, section_type)
-                        response_text = f"✅ Updated {section_type} section with '{extracted_content}'! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
+                        # Extract and return the updated section using the same function as insertion
+                        section_info = find_section_in_cv(updated_cv, section_type)
+                        if section_info and section_info.get('found'):
+                            updated_section = section_info['content']
+                            response_text = f"✅ Updated {section_type} section with '{extracted_content}'! Your CV has been updated.\n\n**Updated {section_type.title()} Section:**\n{updated_section}"
+                        else:
+                            response_text = f"✅ Updated {section_type} section with '{extracted_content}'! Your CV has been updated."
                     else:
                         print(f"[DIAG] No changes made to {section_type} section.")
                         response_text = f"⚠️ No changes made to your {section_type} section."
@@ -5856,7 +6002,7 @@ def reorganize_cv_content(cv_content: str) -> str:
             section_keywords = [
                 'EDUCATION', 'EXPERIENCE', 'SKILLS', 'PROJECTS', 'CERTIFICATIONS',
                 'PROFILE', 'SUMMARY', 'OBJECTIVE', 'ACHIEVEMENTS', 'LEADERSHIP',
-                'VOLUNTEER', 'LANGUAGES', 'TECHNOLOGIES', 'INTERESTS', 'REFERENCES',
+                'EXTRACURRICULARS', 'VOLUNTEER', 'LANGUAGES', 'TECHNOLOGIES', 'INTERESTS', 'REFERENCES',
                 'ADDITIONAL', 'ACTIVITIES', 'AWARDS', 'PUBLICATIONS', 'RESEARCH'
             ]
             return any(keyword in line_upper for keyword in section_keywords)
