@@ -13,8 +13,10 @@ const CVContainer = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  height: 1040px;
+  height: 1140px;
   overflow-y: auto;
+  background: linear-gradient(180deg, #f7f8fc 0%, #f2f5fb 100%);
+  padding: 16px;
 `;
 
 const Header = styled.div`
@@ -120,7 +122,7 @@ const Button = styled.button`
       'var(--primary-gradient)' : 
       'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))'};
     opacity: 0;
-    transition: var(--transition-smooth);
+     transition: var(--transition-smooth);
     z-index: -1;
   }
   
@@ -169,23 +171,23 @@ const Button = styled.button`
 `;
 
 const CVContent = styled.div`
-  background: linear-gradient(135deg, #ffffff, #f8f9fa);
-  border-radius: 16px;
-  padding: 30px;
-  border: 1px solid rgba(102, 126, 234, 0.1);
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 36px;
+  border: 1px solid rgba(27, 31, 59, 0.08);
   white-space: pre-wrap;
   word-wrap: break-word;
   word-break: break-word;
-  font-family: 'Georgia', 'Times New Roman', serif;
-  line-height: 1.8;
-  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  line-height: 1.9;
+  color: #2b2f42;
   width: 100%;
   max-width: 100%;
   position: relative;
-  // min-height: 500px;
-  
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
+
   @media (max-width: 1200px) {
-    padding: 25px;
+    padding: 28px;
   }
   
   @media (max-width: 768px) {
@@ -198,71 +200,99 @@ const CVContent = styled.div`
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 6px;
     background: var(--primary-gradient);
-    border-radius: 16px 16px 0 0;
+    border-radius: 18px 18px 0 0;
   }
   
   /* Enhanced typography for CV content */
   font-size: 1rem;
   
   @media (max-width: 1200px) {
-    font-size: 0.95rem;
+    font-size: 0.96rem;
   }
   
   @media (max-width: 768px) {
-    font-size: 0.9rem;
+    font-size: 0.92rem;
   }
   
-  /* CV Section Headers */
+  /* Headings */
   h1, h2, h3, h4, h5, h6 {
-    color: var(--text-primary);
+    color: #1f2544;
     margin-top: 1.8em;
-    margin-bottom: 0.8em;
+    margin-bottom: 0.75em;
     font-weight: 700;
     line-height: 1.3;
   }
   
   h1 {
-    font-size: 2.2rem;
-    padding-bottom: 12px;
-    margin-bottom: 1.2em;
+    font-size: 2.4rem;
+    padding-bottom: 8px;
+    margin-bottom: 0.9em;
     text-align: center;
-    color: #1a202c;
+    color: #101828;
+    letter-spacing: 0.02em;
   }
   
   h2 {
-    font-size: 1.4rem;
-    color: var(--primary-color);
-    padding-bottom: 6px;
-    margin-top: 2em;
+    font-size: 1.15rem;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 800;
   }
   
   h3 {
-    font-size: 1.2rem;
-    color: #2d3748;
+    font-size: 1.05rem;
+    color: #334155;
   }
   
   /* Paragraphs and text */
   p {
-    margin-bottom: 1em;
+    margin-bottom: 0.9em;
     text-align: justify;
   }
   
   /* Lists */
   ul, ol {
-    margin-left: 2em;
+    margin-left: 1.2em;
     margin-bottom: 1.2em;
   }
   
   li {
-    margin-bottom: 0.5em;
-    line-height: 1.6;
+    margin-bottom: 0.45em;
+    line-height: 1.65;
+  }
+  
+  /* Custom bullets and multi-column list layout (Canva-like) */
+  .cv-list {
+    columns: 2;
+    column-gap: 2rem;
+    padding-left: 1rem;
+    margin-left: 0;
+  }
+  
+  .cv-list-item {
+    position: relative;
+    break-inside: avoid;
+    padding-left: 0.6rem;
+    font-size: 0.95rem;
+  }
+  
+  .cv-list-item::before {
+    content: '';
+    position: absolute;
+    left: -0.6rem;
+    top: 0.7em;
+    width: 6px;
+    height: 6px;
+    background: #667eea;
+    border-radius: 50%;
   }
   
   /* Strong text */
   strong, b {
-    color: var(--text-primary);
+    color: #1f2544;
     font-weight: 700;
   }
   
@@ -270,72 +300,74 @@ const CVContent = styled.div`
   .contact-info {
     text-align: center;
     margin-bottom: 2em;
-    padding: 1.5em;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(102, 126, 234, 0.03));
+    padding: 16px 18px;
+    background: #fafafa;
     border-radius: 12px;
     font-size: 0.95rem;
-    color: #2d3748;
-    border: 1px solid rgba(102, 126, 234, 0.15);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    color: #344054;
+    border: 1px solid rgba(152, 162, 179, 0.24);
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
     font-weight: 500;
   }
   
   /* CV Name styling */
   .cv-name {
     text-align: center;
-    margin: 1.5em 0 1em 0;
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #1a202c;
-    letter-spacing: 0.1rem;
+    margin: 1.25em 0 0.75em 0;
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #101828;
+    letter-spacing: 0.03rem;
   }
   
-  /* CV Section Headers - MUCH LARGER */
+  /* Canva-like section chips */
   .cv-section-header {
-    font-size: 1.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
     font-weight: 800;
-    color: var(--primary-color);
-    margin: 2.5em 0 1.2em 0;
-    padding-bottom: 12px;
-    border-bottom: 3px solid #667eea;
+    color: #1f2937;
+    margin: 2rem 0 1rem 0;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(102, 126, 234, 0.12), rgba(102, 126, 234, 0.06));
+    border: 1px solid rgba(102, 126, 234, 0.24);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    line-height: 1.2;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(102, 126, 234, 0.02));
-    padding: 15px 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
+    letter-spacing: 0.18em;
+  }
+  
+  /* Section accent rule beneath header */
+  .cv-section-header + * {
+    position: relative;
+  }
+  .cv-section-header + *::before {
+    content: '';
+    position: absolute;
+    top: -14px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(102,126,234,0.35) 0%, rgba(102,126,234,0.05) 70%);
   }
   
   /* CV Job Titles */
   .cv-job-title {
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-bottom: 0.5em;
-    color: #2d3748;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.35em;
+    color: #1f2937;
   }
   
-  /* CV Lists */
-  .cv-list {
-    margin-left: 2em;
-    margin-bottom: 1.2em;
-    padding-left: 1.2em;
-  }
-  
-  .cv-list-item {
-    margin-bottom: 0.5em;
-    line-height: 1.6;
-    font-size: 0.9rem;
-  }
-  
-  /* CV Paragraphs - SMALLER */
+  /* CV Paragraphs */
   .cv-paragraph {
-    margin-bottom: 0.8em;
-    font-size: 0.9rem;
-    line-height: 1.6;
+    margin-bottom: 0.75em;
+    font-size: 0.95rem;
+    line-height: 1.7;
     font-weight: 400;
     text-align: justify;
-    color: #4a5568;
+    color: #3f475a;
   }
   
   /* Section dividers */
@@ -345,16 +377,17 @@ const CVContent = styled.div`
   
   /* Improve spacing for better readability */
   & > * {
-    margin-bottom: 0.8em;
+    margin-bottom: 0.75em;
   }
   
-  /* Professional formatting for work experience and education */
+  /* Professional cards for items */
   .experience-item, .education-item, .project-item {
-    margin-bottom: 1.5em;
-    padding: 1em;
-    border-left: 4px solid var(--primary-color);
-    background: rgba(102, 126, 234, 0.02);
-    border-radius: 0 8px 8px 0;
+    margin-bottom: 1.2em;
+    padding: 12px 14px;
+    border-left: 4px solid #667eea;
+    background: #fbfcff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   }
   
   /* Print styles for PDF generation */
@@ -380,10 +413,15 @@ const CVContent = styled.div`
       widows: 3;
     }
     
+    .cv-list {
+      columns: 2;
+    }
+    
     .experience-item, .education-item, .project-item {
       page-break-inside: avoid;
       background: transparent !important;
       border-left: 2px solid #000 !important;
+      box-shadow: none !important;
     }
   }
 `;
@@ -934,33 +972,53 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
     if (!cvData) return;
 
     try {
+      console.log('Starting PDF generation...');
       const pdf = new jsPDF('p', 'mm', 'a4');
+      console.log('PDF object created successfully');
       
-      // Set up fonts and styling
-      pdf.setFont('times', 'normal');
+      // Set up fonts and styling - using Helvetica for modern look
+      pdf.setFont('helvetica', 'normal');
       
-      // Page dimensions
+      // Page dimensions with border
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 20;
+      const borderMargin = 8;
       const maxWidth = pageWidth - (margin * 2);
       
       let yPosition = margin;
-      const lineHeight = 6;
+      const lineHeight = 4.8; // Reduced line height for better spacing
       const maxYPosition = pageHeight - margin;
       
+      // Canva-style color palette
+      const primaryColor = [102, 126, 234]; // #667eea
+      const darkGray = [47, 55, 68]; // #2f3744
+      const mediumGray = [107, 114, 128]; // #6b7280
+      const lightGray = [243, 244, 246]; // #f3f4f6
+      
+      // Add page border
+      const addPageBorder = () => {
+        pdf.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        pdf.setLineWidth(1.5);
+        pdf.rect(borderMargin, borderMargin, pageWidth - (borderMargin * 2), pageHeight - (borderMargin * 2));
+      };
+      
+      addPageBorder();
+      
       // Helper function to add new page if needed
-      const checkPageBreak = (requiredSpace = 15) => {
+      const checkPageBreak = (requiredSpace = 12) => {
         if (yPosition + requiredSpace > maxYPosition) {
           pdf.addPage();
           yPosition = margin;
+          addPageBorder(); // Add border to new page
         }
       };
       
       // Helper function to add text with proper formatting
-      const addFormattedText = (text, fontSize = 11, style = 'normal', align = 'left') => {
+      const addFormattedText = (text, fontSize = 10, style = 'normal', align = 'left', color = darkGray) => {
         pdf.setFontSize(fontSize);
-        pdf.setFont('times', style);
+        pdf.setFont('helvetica', style);
+        pdf.setTextColor(color[0], color[1], color[2]);
         
         const lines = pdf.splitTextToSize(text, maxWidth);
         
@@ -969,6 +1027,20 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
           
           if (align === 'center') {
             pdf.text(lines[i], pageWidth / 2, yPosition, { align: 'center' });
+          } else if (align === 'justify') {
+            // For justify alignment, we need to handle it manually
+            const words = lines[i].split(' ');
+            if (words.length > 1) {
+              const spaceWidth = (maxWidth - pdf.getTextWidth(lines[i].replace(/\s/g, ''))) / (words.length - 1);
+              let currentX = margin;
+              
+              for (let j = 0; j < words.length; j++) {
+                pdf.text(words[j], currentX, yPosition);
+                currentX += pdf.getTextWidth(words[j]) + spaceWidth;
+              }
+            } else {
+              pdf.text(lines[i], margin, yPosition);
+            }
           } else {
             pdf.text(lines[i], margin, yPosition);
           }
@@ -977,34 +1049,51 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
         }
       };
       
-      // Helper function to add section header
+      // Helper function to add Canva-style section header
       const addSectionHeader = (title) => {
         checkPageBreak(20);
-        yPosition += 10; // Extra space before section
+        yPosition += 6; // Space before section
         
-        // Add section title first
-        addFormattedText(title, 14, 'bold');
+        // Add background rectangle for section header (Canva-style chip)
+        const headerHeight = 8;
+        const headerWidth = pdf.getTextWidth(title.toUpperCase()) + 16; // Increased width for better spacing
         
-        // Add section line below the text
-        pdf.setDrawColor(102, 126, 234);
-        pdf.setLineWidth(0.5);
-        pdf.line(margin, yPosition + 2, pageWidth - margin, yPosition + 2);
+        pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        // Use regular rect instead of roundedRect for compatibility
+        pdf.rect(margin, yPosition - 2, headerWidth, headerHeight, 'F');
         
-        yPosition += 10; // Space after header and line
+        // Add section title with white text
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(title.toUpperCase(), margin + 8, yPosition + 3); // Better positioning
+        
+        yPosition += headerHeight + 5; // Space after header
       };
       
-      // Helper function to add contact info block
+      // Helper function to add Canva-style contact info block
       const addContactBlock = (contactLines) => {
         checkPageBreak(20);
-        yPosition += 5; // Space before contact block
+        yPosition += 4; // Space before contact block
         
-        // Add contact info with special formatting
+        // Add background rectangle for contact info
+        const contactHeight = (contactLines.length * 4.5) + 6;
+        pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+        // Use regular rect instead of roundedRect for compatibility
+        pdf.rect(margin + 10, yPosition - 2, maxWidth - 20, contactHeight, 'F');
+        
+        yPosition += 3;
+        
+        // Add contact info with centered formatting
         for (const contactLine of contactLines) {
-          addFormattedText(contactLine, 10, 'normal', 'center');
-          yPosition += 2; // Tighter spacing for contact info
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+          pdf.text(contactLine, pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 4;
         }
         
-        yPosition += 5; // Space after contact block
+        yPosition += 4; // Space after contact block
       };
       
       // Use the same parsing logic as the display
@@ -1113,56 +1202,75 @@ function CVDisplay({ cvUploaded, refreshTrigger }) {
         
         lastWasSection = false;
         
-        // Detect name (usually first significant line)
+        // Detect name (usually first significant line) - Canva-style name header
         const isName = !nameRendered && line.length > 5 && line.length < 50 && !line.includes('@') && !isSectionHeader(line);
         
         if (isName) {
-          addFormattedText(line, 18, 'bold', 'center');
-          yPosition += 5;
+          // Add top accent bar
+          pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          pdf.rect(0, 0, pageWidth, 4, 'F');
+          
+          yPosition += 8;
+          
+          // Add name with large, bold styling
+          pdf.setFontSize(22);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+          pdf.text(line, pageWidth / 2, yPosition, { align: 'center' });
+          
+          yPosition += 8;
           nameRendered = true;
         } else if (contactBlock.length === 0) {
-          // Regular content - handle different types
-          let fontSize = 9;
+          // Regular content - handle different types with Canva styling
+          let fontSize = 9.5; // Increased font size for better readability
           let style = 'normal';
+          let textColor = darkGray;
           
           // Special handling for certification content (lines that look like certification names)
           if (lastWasSection && line.length > 10 && line.length < 100 && !line.includes('●') && !line.includes('•')) {
-            // This might be a certification name or description
-            addFormattedText(line, fontSize, 'bold');
+            // This might be a certification name or description - make it prominent
+            addFormattedText(line, 10.5, 'bold', 'left', darkGray);
           } else if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
-            // Bullet points
-            const bulletText = '• ' + line.substring(1).trim();
-            addFormattedText(bulletText, fontSize, style);
+            // Bullet points with modern styling
+            const bulletText = '▪ ' + line.substring(1).trim();
+            addFormattedText(bulletText, fontSize, style, 'left', mediumGray);
           } else if (line.includes(':') && line.length < 100) {
-            // Likely a label or job title
-            addFormattedText(line, fontSize, 'bold');
+            // Likely a label or job title - make it stand out
+            addFormattedText(line, 10.5, 'bold', 'left', darkGray);
           } else {
-            // Regular text
-            addFormattedText(line, fontSize, style);
+            // Regular text with improved readability and left alignment
+            addFormattedText(line, fontSize, style, 'left', mediumGray);
           }
         }
       }
       
-      // Add footer
+      // Add Canva-style footer
       const pageCount = pdf.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setFont('times', 'italic');
-        pdf.setTextColor(128, 128, 128);
         
-        // Add page number
-        pdf.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+        // Add subtle footer bar
+        pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+        pdf.rect(0, pageHeight - 6, pageWidth, 6, 'F');
+        
+        pdf.setFontSize(6.5);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+        
+        // Add page number with modern styling
+        pdf.text(`${i} / ${pageCount}`, pageWidth - margin, pageHeight - 2, { align: 'right' });
         
         // Add generation date
         const date = new Date().toLocaleDateString();
-        pdf.text(`Generated on ${date}`, margin, pageHeight - 10);
+        pdf.text(`Generated ${date}`, margin, pageHeight - 2);
       }
       
       // Download the PDF
       const filename = cvData.filename ? `Enhanced_${cvData.filename.replace(/\.[^/.]+$/, '')}_${new Date().toISOString().split('T')[0]}.pdf` : `Enhanced_CV_${new Date().toISOString().split('T')[0]}.pdf`;
       
+      console.log('Saving PDF with filename:', filename);
       pdf.save(filename);
+      console.log('PDF saved successfully');
       
     } catch (error) {
       console.error('Error generating PDF:', error);
