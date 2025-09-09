@@ -29,6 +29,13 @@ except ImportError:
     print("❌ ERROR: db.py not found. Please ensure the database configuration file exists.")
     raise ImportError("Database configuration file (db.py) is required")
 
+# Supabase client (for REST access to Postgres)
+try:
+    from supabase_db import get_supabase_client
+    SUPABASE_AVAILABLE = True
+except Exception as _e:
+    SUPABASE_AVAILABLE = False
+
 # Comprehensive Section Detection Patterns - Exhaustive CV Section Headings
 SECTION_PATTERNS = {
     # Personal & Contact Information
@@ -4118,24 +4125,22 @@ async def root():
 async def test_endpoint():
     """Test endpoint to verify backend and database connectivity"""
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            # Test database connection
-            cursor.execute("SELECT COUNT(*) FROM manual_projects")
-            project_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM cvs")
-            cv_count = cursor.fetchone()[0]
-            
-            return {
-                "status": "healthy",
-                "database": "connected",
-                "projects_count": project_count,
-                "cvs_count": cv_count,
-                "timestamp": datetime.now().isoformat(),
-                "cors_origins": os.getenv("CORS_ORIGINS", "not_set"),
-                "allowed_origins": allowed_origins,
-                "cors_fixed": "YES - All origins allowed"
-            }
+        # Use Supabase as the source of truth
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        project_count = len(sb.list_manual_projects())
+        cv_count = len(sb.list_cvs())
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "projects_count": project_count,
+            "cvs_count": cv_count,
+            "timestamp": datetime.now().isoformat(),
+            "cors_origins": os.getenv("CORS_ORIGINS", "not_set"),
+            "allowed_origins": allowed_origins,
+            "cors_fixed": "YES - All origins allowed"
+        }
     except Exception as e:
         return {
             "status": "error",
@@ -4186,18 +4191,16 @@ async def upload_cv(
             # Generate a title from filename
             title = file.filename.replace('.pdf', '').replace('.docx', '').replace('.txt', '').replace('_', ' ').title()
             
-            # Clear all existing projects when new CV is uploaded
-            cursor.execute("DELETE FROM manual_projects")
+            # Clear local manual_projects for freshness (best effort)
+            try:
+                with get_db_cursor_context() as (cursor, conn):
+                    cursor.execute("DELETE FROM manual_projects")
+            except Exception:
+                pass
             print("🗑️ Cleared existing projects")
             
-            # Set all other CVs as inactive
-            cursor.execute("UPDATE cvs SET is_active = FALSE")
-            print("🔄 Set other CVs as inactive")
-            
-            # Insert new CV as active
-            cursor.execute('''INSERT INTO cvs (title, filename, original_content, current_content, is_active) 
-                             VALUES (?, ?, ?, ?, TRUE)''', 
-                          (title, file.filename, cv_text, cv_text))
+            # Insert into Supabase (makes it active)
+            sb.insert_cv(title, file.filename, cv_text)
             
             print(f"✅ Successfully stored CV in database. Content length: {len(cv_text)} characters")
             
@@ -4213,9 +4216,18 @@ async def upload_cv(
             # Extract and insert projects from CV
             extracted_projects = extract_projects_from_cv(stored_cv[0])
             print(f"🔍 Extracted {len(extracted_projects)} projects from CV.")
-            for project in extracted_projects:
-                cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", (json.dumps(project),))
-            print(f"✅ Inserted {len(extracted_projects)} projects into manual_projects table.")
+            # Mirror to local sqlite (best effort)
+            try:
+                for project in extracted_projects:
+                    cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", (json.dumps(project),))
+                print(f"✅ Inserted {len(extracted_projects)} projects into manual_projects table.")
+            except Exception:
+                pass
+            # Mirror to Supabase (best effort; requires table manual_projects(project_data jsonb))
+            try:
+                sb.insert_manual_projects(extracted_projects)
+            except Exception:
+                pass
         
         return JSONResponse(status_code=200, content={
             "message": f"✅ CV uploaded successfully! Chat system now has full access to your {len(cv_text)} character CV content.", 
@@ -4348,20 +4360,34 @@ async def upload_cv_for_projects(
 @app.post("/chat/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
-                          (request.message, "user"))
-        
-            # Get current CV content for context with enhanced debugging
-            cursor.execute("SELECT current_content, filename FROM cvs WHERE is_active = TRUE LIMIT 1")
-            cv_row = cursor.fetchone()
-            
-            if cv_row:
-                cv_content, filename = cv_row
-                print(f"📋 Chat accessing CV: {filename} ({len(cv_content) if cv_content else 0} characters)")
-            else:
-                cv_content = None
-                print("⚠️ No active CV found in database")
+        # Store user message locally (best effort)
+        try:
+            with get_db_cursor_context() as (cursor, conn):
+                cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
+                              (request.message, "user"))
+        except Exception:
+            pass
+
+        # Get current CV from Supabase
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        cv_content = sb.get_active_cv_content()
+        filename = None
+        if cv_content:
+            lst = sb.list_cvs()
+            if lst:
+                filename = lst[0].get("filename")
+            print(f"📋 Chat accessing CV: {filename or 'Active CV'} ({len(cv_content)} characters)")
+        else:
+            print("⚠️ No active CV found in Supabase")
+
+        # Also fetch any mirrored manual projects from Supabase (best effort)
+        try:
+            projects = sb.list_manual_projects()
+            print(f"[Supabase] Loaded {len(projects)} mirrored manual_projects")
+        except Exception:
+            projects = []
             
             # Use intelligent detection first for specific cases
             extracted_content, detected_section = extract_intelligent_content(request.message)
@@ -4918,25 +4944,18 @@ async def chat(request: ChatRequest):
 @app.get("/cv/current/", response_model=CVResponse)
 async def get_current_cv():
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            # Get the active CV with current content (includes all updates)
-            cursor.execute("SELECT filename, current_content, updated_at FROM cvs WHERE is_active = TRUE LIMIT 1")
-            cv_row = cursor.fetchone()
-            
-            if not cv_row:
-                # If no active CV, get the most recent one
-                cursor.execute("SELECT filename, current_content, updated_at FROM cvs ORDER BY updated_at DESC LIMIT 1")
-                cv_row = cursor.fetchone()
-            
-            if not cv_row:
-                raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
-            
-            filename, current_content, updated_at = cv_row
-            
-            # Format the current CV for better display (this includes all updates)
-            formatted_cv = format_cv_for_display(current_content)
-            
-            return CVResponse(content=formatted_cv, filename=filename, last_updated=updated_at)
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        current_content = sb.get_active_cv_content()
+        if not current_content:
+            raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+        formatted_cv = format_cv_for_display(current_content)
+        # We don't have filename in this quick lookup; fetch latest record for meta
+        lst = sb.list_cvs()
+        filename = lst[0]["filename"] if lst else "CV Document"
+        updated_at = lst[0].get("updated_at") if lst else None
+        return CVResponse(content=formatted_cv, filename=filename, last_updated=updated_at)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -4988,54 +5007,34 @@ def format_cv_for_display(cv_content: str) -> str:
 # New CV Management Endpoints
 @app.get("/cvs/")
 async def list_all_cvs():
-    """Get list of all CVs with metadata"""
+    """Get list of all CVs with metadata (Supabase)"""
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            cursor.execute('''SELECT id, title, filename, created_at, updated_at, is_active 
-                             FROM cvs ORDER BY updated_at DESC''')
-            cvs = cursor.fetchall()
-            
-            cv_list = []
-            for cv in cvs:
-                cv_id, title, filename, created_at, updated_at, is_active = cv
-                cv_list.append({
-                    "id": cv_id,
-                    "title": title,
-                    "filename": filename,
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                    "is_active": bool(is_active)
-                })
-            
-            return {"cvs": cv_list, "total_count": len(cv_list)}
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        cv_list = sb.list_cvs()
+        return {"cvs": cv_list, "total_count": len(cv_list)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/cvs/{cv_id}")
 async def get_cv_by_id(cv_id: int):
-    """Get specific CV by ID"""
+    """Get specific CV by ID (Supabase)"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''SELECT id, title, filename, current_content, created_at, updated_at, is_active 
-                         FROM cvs WHERE id = ?''', (cv_id,))
-        cv_row = cursor.fetchone()
-        conn.close()
-        
-        if not cv_row:
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        cv = sb.get_cv(cv_id)
+        if not cv:
             raise HTTPException(status_code=404, detail="CV not found")
-        
-        cv_id, title, filename, content, created_at, updated_at, is_active = cv_row
-        
         return {
-            "id": cv_id,
-            "title": title,
-            "filename": filename,
-            "content": content,
-            "created_at": created_at,
-            "updated_at": updated_at,
-            "is_active": bool(is_active)
+            "id": cv["id"],
+            "title": cv["title"],
+            "filename": cv["filename"],
+            "content": cv.get("current_content"),
+            "created_at": cv.get("created_at"),
+            "updated_at": cv.get("updated_at"),
+            "is_active": bool(cv.get("is_active"))
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
@@ -5046,113 +5045,59 @@ class CVUpdateRequest(BaseModel):
 
 @app.put("/cvs/{cv_id}")
 async def update_cv(cv_id: int, cv_data: CVUpdateRequest):
-    """Update CV title and/or content"""
+    """Update CV title and/or content (Supabase)"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # Check if CV exists
-        cursor.execute("SELECT id FROM cvs WHERE id = ?", (cv_id,))
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="CV not found")
-        
-        # Update fields that are provided
-        update_fields = []
-        params = []
-        
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        fields = {}
         if cv_data.title is not None:
-            update_fields.append("title = ?")
-            params.append(cv_data.title)
-            
+            fields["title"] = cv_data.title
         if cv_data.content is not None:
-            update_fields.append("current_content = ?")
-            params.append(cv_data.content)
-        
-        if update_fields:
-            update_fields.append("updated_at = CURRENT_TIMESTAMP")
-            params.append(cv_id)
-            
-            query = f"UPDATE cvs SET {', '.join(update_fields)} WHERE id = ?"
-            cursor.execute(query, params)
-        
-        conn.commit()
-        conn.close()
-        
+            fields["current_content"] = cv_data.content
+        if fields:
+            fields["updated_at"] = datetime.utcnow().isoformat()
+            sb.update_cv(cv_id, fields)
         return {"message": "CV updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.delete("/cvs/{cv_id}")
 async def delete_cv(cv_id: int):
-    """Delete a CV"""
+    """Delete a CV (Supabase)"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # Check if CV exists
-        cursor.execute("SELECT is_active FROM cvs WHERE id = ?", (cv_id,))
-        cv_row = cursor.fetchone()
-        
-        if not cv_row:
-            raise HTTPException(status_code=404, detail="CV not found")
-        
-        was_active = cv_row[0]
-        
-        # Delete the CV
-        cursor.execute("DELETE FROM cvs WHERE id = ?", (cv_id,))
-        
-        # If the deleted CV was active, make the most recent CV active
-        if was_active:
-            cursor.execute('''UPDATE cvs SET is_active = TRUE 
-                             WHERE id = (SELECT id FROM cvs ORDER BY updated_at DESC LIMIT 1)''')
-        
-        conn.commit()
-        conn.close()
-        
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        sb.delete_cv(cv_id)
         return {"message": "CV deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.post("/cvs/{cv_id}/activate")
 async def activate_cv(cv_id: int):
-    """Set a CV as the active one"""
+    """Set a CV as the active one (Supabase)"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        # Check if CV exists
-        cursor.execute("SELECT id FROM cvs WHERE id = ?", (cv_id,))
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="CV not found")
-        
-        # Set all CVs as inactive
-        cursor.execute("UPDATE cvs SET is_active = FALSE")
-        
-        # Set the specified CV as active
-        cursor.execute("UPDATE cvs SET is_active = TRUE WHERE id = ?", (cv_id,))
-        
-        conn.commit()
-        conn.close()
-        
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        sb.activate_cv(cv_id)
         return {"message": "CV activated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.post("/cvs/{cv_id}/download")
 async def download_cv_by_id(cv_id: int):
-    """Download a specific CV as PDF"""
+    """Download a specific CV as PDF (Supabase)"""
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''SELECT title, current_content FROM cvs WHERE id = ?''', (cv_id,))
-        cv_row = cursor.fetchone()
-        conn.close()
-        
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        cv_row = sb.get_cv_content_for_download(cv_id)
         if not cv_row:
             raise HTTPException(status_code=404, detail="CV not found")
-        
-        title, content = cv_row
+        title = cv_row.get("title")
+        content = cv_row.get("current_content")
         
         # Format CV with AI for better structure
         formatted_content = format_cv_with_ai(content)
@@ -5779,25 +5724,23 @@ async def create_cv_from_builder(cv_data: CVBuilderRequest):
         title = f"{personal_info.get('full_name', 'Professional')} CV"
         filename = f"cv_builder_{personal_info.get('full_name', 'professional').lower().replace(' ', '_')}.txt"
         
-        # Store in database
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
+        # Store in Supabase
+        if not SUPABASE_AVAILABLE:
+            raise RuntimeError("Supabase client not available")
+        sb = get_supabase_client()
+        sb.insert_cv(title, filename, cv_text)
         
-        # Set all other CVs as inactive
-        cursor.execute("UPDATE cvs SET is_active = FALSE")
-        
-        # Insert new CV as active
-        cursor.execute('''INSERT INTO cvs (title, filename, original_content, current_content, is_active) 
-                         VALUES (?, ?, ?, ?, TRUE)''', 
-                      (title, filename, cv_text, cv_text))
-        
-        # Store projects separately
+        # Store projects separately (kept in local table if present)
         for project in cv_data.projects:
             project_json = json.dumps(project)
-            cursor.execute('INSERT INTO manual_projects (project_data) VALUES (?)', (project_json,))
-        
-        conn.commit()
-        conn.close()
+            try:
+                conn = sqlite3.connect('cv_updater.db')
+                cursor = conn.cursor()
+                cursor.execute('INSERT INTO manual_projects (project_data) VALUES (?)', (project_json,))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
         
         return {
             "message": "CV created successfully from CV Builder",
