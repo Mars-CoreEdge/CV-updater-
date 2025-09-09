@@ -17,6 +17,7 @@ const CVContainer = styled.div`
   overflow-y: auto;
   background: linear-gradient(180deg, #f7f8fc 0%, #f2f5fb 100%);
   padding: 16px;
+  transition: none;
 `;
 
 const Header = styled.div`
@@ -94,7 +95,7 @@ const Button = styled.button`
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
-  transition: var(--transition-spring);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
@@ -108,7 +109,7 @@ const Button = styled.button`
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    transition: var(--transition-smooth);
+    transition: left 0.3s ease;
   }
   
   &::after {
@@ -122,7 +123,7 @@ const Button = styled.button`
       'var(--primary-gradient)' : 
       'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))'};
     opacity: 0;
-     transition: var(--transition-smooth);
+    transition: opacity 0.2s ease;
     z-index: -1;
   }
   

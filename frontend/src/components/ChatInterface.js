@@ -12,6 +12,7 @@ const ChatContainer = styled.div`
   position: relative;
   max-height: 900px;
   min-height: 900px;
+  transition: none;
   
   @media (max-width: 1200px) {
     height: 850px;
@@ -80,7 +81,7 @@ const RefreshCVButton = styled.button`
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: var(--transition-spring);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
@@ -114,7 +115,7 @@ const QuickActionButton = styled.button`
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: var(--transition-spring);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   position: relative;
   overflow: hidden;
   backdrop-filter: var(--backdrop-blur-sm);
@@ -130,7 +131,7 @@ const QuickActionButton = styled.button`
     bottom: 0;
     background: var(--primary-gradient);
     opacity: 0;
-    transition: var(--transition-smooth);
+    transition: opacity 0.2s ease;
     z-index: 0;
   }
   
@@ -142,7 +143,7 @@ const QuickActionButton = styled.button`
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    transition: var(--transition-smooth);
+    transition: left 0.3s ease;
     z-index: 1;
   }
   
@@ -190,7 +191,7 @@ const GenerateCVButton = styled.button`
   font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  transition: var(--transition-spring);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   width: 100%;
   margin-bottom: var(--spacing-sm);
   box-shadow: var(--shadow-glow-success);
@@ -208,7 +209,7 @@ const GenerateCVButton = styled.button`
     bottom: 0;
     background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
     opacity: 0;
-    transition: var(--transition-smooth);
+    transition: opacity 0.2s ease;
   }
   
   &::after {
@@ -219,7 +220,7 @@ const GenerateCVButton = styled.button`
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-    transition: var(--transition-smooth);
+    transition: left 0.3s ease;
   }
   
   &:hover:not(:disabled) {
@@ -531,7 +532,7 @@ const Input = styled.input`
   border-radius: 25px;
   font-size: 1rem;
   outline: none;
-  transition: var(--transition-smooth);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   background: linear-gradient(135deg, #ffffff, #f8f9fa);
   color: var(--text-primary);
   
@@ -560,7 +561,7 @@ const InputIcon = styled.div`
   transform: translateY(-50%);
   color: var(--text-secondary);
   font-size: 1.1rem;
-  transition: var(--transition-fast);
+  transition: color 0.2s ease;
   
   ${Input}:focus + & {
     color: var(--primary-color);
@@ -576,7 +577,7 @@ const SendButton = styled.button`
   cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
-  transition: var(--transition-smooth);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   min-width: 120px;
   box-shadow: var(--shadow-md);
   position: relative;
@@ -590,7 +591,7 @@ const SendButton = styled.button`
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: var(--transition-smooth);
+    transition: left 0.3s ease;
   }
   
   &:hover:not(:disabled) {

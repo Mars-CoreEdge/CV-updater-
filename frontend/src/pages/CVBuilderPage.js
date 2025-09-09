@@ -5,14 +5,17 @@ import axios from 'axios';
 
 const PageContainer = styled.div`
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: radial-gradient(1200px 600px at -10% -10%, #eef2ff 0%, transparent 60%),
+              radial-gradient(1000px 500px at 110% 10%, #fae8ff 0%, transparent 60%),
+              linear-gradient(180deg, #f8fafc 0%, #eef2f7 60%, #e6eef5 100%);
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   position: relative;
   overflow-x: hidden;
+  color: #0f172a;
 `;
 
 const TopNavBar = styled.nav`
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
   border-bottom: 1px solid #e2e8f0;
   padding: 0 24px;
   height: 70px;
@@ -22,7 +25,8 @@ const TopNavBar = styled.nav`
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: saturate(140%) blur(6px);
 `;
 
 const NavLeft = styled.div`
@@ -105,15 +109,16 @@ const SaveIndicator = styled.div`
 const MainContainer = styled.div`
   display: flex;
   height: calc(100vh - 70px);
-  background: #f8fafc;
+  background: transparent;
 `;
 
 const Sidebar = styled.div`
   width: 280px;
-  background: white;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  box-shadow: 8px 0 24px rgba(15, 23, 42, 0.04);
   
   @media (max-width: 1024px) {
     display: none;
@@ -143,11 +148,14 @@ const StepsContainer = styled.div`
   flex: 1;
   padding: 16px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 `;
 
 const ProgressSection = styled.div`
   padding: 16px 24px 24px;
   border-bottom: 1px solid #f1f5f9;
+  background: transparent;
 `;
 
 const ProgressLabel = styled.div`
@@ -182,9 +190,9 @@ const ProgressBar = styled.div`
     left: 0;
     height: 100%;
     width: ${props => ((props.currentStep + 1) / props.totalSteps) * 100}%;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
     border-radius: inherit;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
 `;
 
@@ -196,9 +204,10 @@ const MainContent = styled.div`
 `;
 
 const ContentHeader = styled.div`
-  background: white;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid #e2e8f0;
   padding: 24px 32px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
   
   h1 {
     font-size: 1.75rem;
@@ -219,11 +228,12 @@ const ContentHeader = styled.div`
 const ContentBody = styled.div`
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1.1fr 420px;
+  gap: 20px;
   overflow: hidden;
   
   @media (max-width: 1400px) {
-    grid-template-columns: 1fr 350px;
+    grid-template-columns: 1fr 360px;
   }
   
   @media (max-width: 1024px) {
@@ -232,9 +242,10 @@ const ContentBody = styled.div`
 `;
 
 const FormSection = styled.div`
-  background: white;
+  background: #ffffff;
   overflow-y: auto;
-  padding: 32px;
+  padding: 36px;
+  border-right: 1px solid #eef2f7;
   
   /* Custom scrollbar */
   &::-webkit-scrollbar {
@@ -284,17 +295,13 @@ const StepItem = styled.div`
   border-radius: 16px;
   margin-bottom: 12px;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  color: ${props => props.active ? '#2c3e50' : 'rgba(255, 255, 255, 0.85)'};
-  background: ${props => 
-    props.active ? 'rgba(255, 255, 255, 0.95)' : 
-    props.completed ? 'rgba(255, 255, 255, 0.15)' : 
-    'transparent'};
-  border: 1px solid ${props => 
-    props.active ? 'rgba(255, 255, 255, 0.4)' : 
-    'transparent'};
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.15s ease, box-shadow 0.25s ease;
+  color: ${props => props.active ? '#0f172a' : '#475569'};
+  background: ${props => props.active ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.8)'};
+  border: 1px solid ${props => props.active ? '#e2e8f0' : '#eef2f7'};
   position: relative;
   overflow: hidden;
+  box-shadow: ${props => props.active ? '0 8px 24px rgba(15, 23, 42, 0.08)' : '0 2px 8px rgba(15, 23, 42, 0.04)'};
   
   &::before {
     content: '';
@@ -303,21 +310,19 @@ const StepItem = styled.div`
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08));
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.2s ease;
   }
   
   &:hover::before {
-    opacity: ${props => props.active ? 0 : 1};
+    opacity: ${props => props.active ? 0.05 : 1};
   }
   
   &:hover {
-    background: ${props => 
-      props.active ? 'rgba(255, 255, 255, 0.95)' : 
-      'rgba(255, 255, 255, 0.2)'};
-    transform: translateX(4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    background: ${props => props.active ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.9)'};
+    transform: translateX(3px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
   }
   
   .step-number {
@@ -379,7 +384,7 @@ const Input = styled.input`
   border-radius: 8px;
   font-size: 0.925rem;
   font-weight: 400;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   background: white;
   color: #1f2937;
   
@@ -411,7 +416,7 @@ const TextArea = styled.textarea`
   border-radius: 8px;
   font-size: 0.925rem;
   font-weight: 400;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   background: white;
   resize: vertical;
   min-height: 100px;
@@ -445,7 +450,7 @@ const TagInput = styled.div`
   background: white;
   min-height: 60px;
   align-items: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   position: relative;
   z-index: 2;
   
@@ -474,7 +479,7 @@ const Tag = styled.span`
   align-items: center;
   gap: 8px;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   
   &:hover {
     transform: translateY(-1px);
@@ -486,7 +491,7 @@ const Tag = styled.span`
     font-weight: 700;
     padding: 4px 6px;
     border-radius: 50%;
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, transform 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -526,7 +531,7 @@ const Button = styled.button`
   font-size: 0.925rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   position: relative;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   letter-spacing: 0.01em;
@@ -566,75 +571,96 @@ const ButtonGroup = styled.div`
 
 const PreviewCV = styled.div`
   font-family: 'Inter', 'Segoe UI', sans-serif;
-  line-height: 1.7;
-  color: #1a202c;
-  background: white;
-  border-radius: 12px;
-  padding: 25px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f7fafc;
-  
-  h1 {
-    font-size: 1.9rem;
-    color: #1a202c;
-    margin-bottom: 8px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+  line-height: 1.75;
+  color: #1f2937;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
+  border: 1px solid #eef2f7;
+  position: relative;
+
+  /* Canva-style top accent */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    border-radius: 16px 16px 0 0;
   }
   
+  /* Name heading */
+  h1 {
+    font-size: 2.2rem;
+    color: #0f172a;
+    margin: 8px 0 16px 0;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-align: left;
+  }
+  
+  /* Contact pill */
   .contact-info {
-    color: #718096;
-    margin-bottom: 25px;
-    font-size: 0.95rem;
+    text-align: left;
+    margin-bottom: 26px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border: 1px solid #e6edf5;
+    border-radius: 12px;
+    font-size: 0.96rem;
+    color: #475569;
     font-weight: 500;
   }
   
+  /* Section header chip */
   h2 {
-    font-size: 1.25rem;
-    color: #2d3748;
-    border-bottom: 2px solid #667eea;
-    padding-bottom: 8px;
-    margin: 25px 0 15px 0;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #111827;
+    margin: 18px 0 14px 0;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08));
+    border: 1px solid rgba(99,102,241,0.28);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
   }
   
   .section-content {
     margin-bottom: 20px;
   }
   
+  /* Professional cards */
   .experience-item, .education-item, .project-item {
     margin-bottom: 18px;
-    padding-left: 15px;
-    border-left: 3px solid #667eea;
-    position: relative;
-    
-    &::before {
-      content: '';
-      position: absolute;
-      left: -6px;
-      top: 5px;
-      width: 9px;
-      height: 9px;
-      background: #667eea;
-      border-radius: 50%;
-    }
+    padding: 12px 14px;
+    border-left: 4px solid #6366f1;
+    background: #fbfdff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   }
   
   .item-title {
     font-weight: 700;
-    color: #1a202c;
-    font-size: 1.05rem;
+    color: #111827;
+    font-size: 1rem;
     margin-bottom: 4px;
   }
   
   .item-subtitle {
-    color: #718096;
+    color: #64748b;
     font-style: italic;
     font-size: 0.9rem;
     margin-bottom: 8px;
   }
   
+  /* Skills as chips */
   .skills-list {
     display: flex;
     flex-wrap: wrap;
@@ -646,10 +672,10 @@ const PreviewCV = styled.div`
     background: linear-gradient(135deg, #f7fafc, #edf2f7);
     border: 1px solid #e2e8f0;
     padding: 6px 12px;
-    border-radius: 20px;
+    border-radius: 999px;
     font-size: 0.85rem;
-    color: #4a5568;
-    font-weight: 500;
+    color: #475569;
+    font-weight: 600;
   }
 `;
 
@@ -662,7 +688,7 @@ const AddButton = styled.button`
   cursor: pointer;
   font-weight: 600;
   font-size: 0.9rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
   width: 100%;
   display: flex;
   align-items: center;
@@ -674,6 +700,7 @@ const AddButton = styled.button`
     color: white;
     border-color: #3b82f6;
     border-style: solid;
+    transform: translateY(-1px);
   }
   
   &::before {
@@ -692,7 +719,7 @@ const RemoveButton = styled.button`
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
   box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);
   
   &:hover {
@@ -713,7 +740,7 @@ const ItemCard = styled.div`
   padding: 20px;
   margin-bottom: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   position: relative;
   
   &:hover {
@@ -752,7 +779,7 @@ const StepNumber = styled.div`
   flex-shrink: 0;
   
   background: ${props => props.active 
-    ? 'linear-gradient(135deg, #0ea5e9, #0284c7)'
+    ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
     : props.completed 
       ? 'linear-gradient(135deg, #22c55e, #16a34a)'
       : '#e2e8f0'
@@ -760,7 +787,7 @@ const StepNumber = styled.div`
   
   color: ${props => (props.active || props.completed) ? 'white' : '#64748b'};
   
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   
   &::after {
     content: '${props => props.completed ? '✓' : props.number}';
@@ -796,6 +823,8 @@ const SectionTitle = styled.h2`
   align-items: center;
   gap: 10px;
   letter-spacing: -0.01em;
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 12px;
 `;
 
 function CVBuilderPage() {

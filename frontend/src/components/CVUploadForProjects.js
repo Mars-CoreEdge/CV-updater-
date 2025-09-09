@@ -11,7 +11,12 @@ const UploadContainer = styled.div`
   margin: 20px 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   border: 2px dashed rgba(102, 126, 234, 0.3);
-  transition: all 0.3s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  /* Prevent global transition variables from affecting panel */
+  will-change: auto;
+  
+  /* Explicitly disable other transitions on the container */
+  
   
   &:hover {
     border-color: rgba(102, 126, 234, 0.6);
@@ -46,7 +51,7 @@ const DropZone = styled.div`
   padding: 30px 20px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: border-color 0.3s ease, background 0.3s ease;
   background: ${props => props.isDragOver ? 'rgba(102, 126, 234, 0.05)' : 'rgba(248, 250, 252, 0.8)'};
   
   &:hover {
@@ -103,7 +108,7 @@ const Button = styled.button`
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   margin-top: 15px;
   
   &:hover:not(:disabled) {

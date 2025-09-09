@@ -5767,8 +5767,12 @@ class CVBuilderRequest(BaseModel):
 async def create_cv_from_builder(cv_data: CVBuilderRequest):
     """Create a new CV from the CV Builder data"""
     try:
-        # Generate CV text from structured data
-        cv_text = generate_cv_text_from_data(cv_data.dict())
+        # Generate CV text from structured data (pydantic v2 compatible)
+        try:
+            cv_text = generate_cv_text_from_data(cv_data.model_dump())
+        except AttributeError:
+            # Fallback for older pydantic
+            cv_text = generate_cv_text_from_data(cv_data.dict())
         
         # Generate title from personal info
         personal_info = cv_data.personal_info

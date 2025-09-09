@@ -185,7 +185,7 @@ const Button = styled.button`
   cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
-  transition: var(--transition-smooth);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
   
@@ -197,7 +197,7 @@ const Button = styled.button`
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: var(--transition-smooth);
+    transition: left 0.3s ease;
   }
   
   &:hover:not(:disabled) {
