@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import { uploadCvFileToStorage, insertCvRow } from '../services/supabaseCvService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
@@ -190,7 +192,9 @@ function CVUploadForProjects({ onProjectsExtracted }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [error, setError] = useState('');
+  const [title, setTitle] = useState('');
   const fileInputRef = useRef(null);
+  const { user } = useAuth?.() || { user: null };
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -204,6 +208,12 @@ function CVUploadForProjects({ onProjectsExtracted }) {
     if (file && (file.type === 'application/pdf' || 
                  file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
                  file.type === 'text/plain')) {
+      // 5MB limit
+      const maxBytes = 5 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setError('File size must be 5MB or less.');
+        return;
+      }
       setSelectedFile(file);
       setUploadStatus('');
       setError('');
@@ -268,9 +278,38 @@ function CVUploadForProjects({ onProjectsExtracted }) {
         onProjectsExtracted(extractedProjects);
       }
 
+      // If the user is authenticated, also upload to Supabase Storage and insert a row in `cvs`
+      if (user?.id) {
+        setUploadStatus('Uploading file to secure storage...');
+        const { path, error: storageError } = await uploadCvFileToStorage(selectedFile, user.id);
+        if (storageError) {
+          console.error('Supabase storage upload error:', storageError);
+          setError('Uploaded projects, but failed to store CV file securely.');
+        } else {
+          setUploadStatus('Saving CV metadata...');
+          const placeholder = 'Original content extracted from CV';
+          const insertTitle = title?.trim() ? title.trim() : (selectedFile?.name || 'Untitled CV');
+          const { error: insertError } = await insertCvRow({
+            filename: path,
+            title: insertTitle,
+            original_content: placeholder,
+            current_content: placeholder,
+            user_id: user.id,
+            url: path
+          });
+          if (insertError) {
+            console.error('Supabase insert error:', insertError);
+            setError('Stored file, but failed to save CV record.');
+          } else {
+            setUploadStatus('CV securely saved to your library.');
+          }
+        }
+      }
+
       // Clear the file input
       setSelectedFile(null);
       setIsDragOver(false);
+      setTitle('');
       
       setTimeout(() => {
         setUploadStatus('');
@@ -329,6 +368,20 @@ function CVUploadForProjects({ onProjectsExtracted }) {
         <FileInfo>
           <div className="file-name">{selectedFile.name}</div>
           <div className="file-size">{formatFileSize(selectedFile.size)}</div>
+          <div style={{ marginTop: 10 }}>
+            <input
+              type="text"
+              placeholder="Optional title for your CV"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(102, 126, 234, 0.3)'
+              }}
+            />
+          </div>
           
           <Button 
             onClick={handleFileUpload} 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { fetchUserCvs, createSignedUrl } from '../services/supabaseCvService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
@@ -435,11 +437,27 @@ function CVManagementPage() {
   const [editingCV, setEditingCV] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [userCvs, setUserCvs] = useState([]);
+  const [userCvsLoading, setUserCvsLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth?.() || { user: null };
 
   useEffect(() => {
     fetchCVs();
-  }, []);
+    if (user?.id) {
+      loadUserCvs(user.id);
+    }
+  }, [user?.id]);
+
+  const loadUserCvs = async (userId) => {
+    try {
+      setUserCvsLoading(true);
+      const { data, error } = await fetchUserCvs(userId);
+      if (!error) setUserCvs(data);
+    } finally {
+      setUserCvsLoading(false);
+    }
+  };
 
   const fetchCVs = async () => {
     try {
@@ -642,6 +660,58 @@ function CVManagementPage() {
                     onClick={() => deleteCV(cv.id)}
                   >
                     Delete
+                  </CVActionButton>
+                </CVActions>
+              </CVCard>
+            ))}
+          </CVGrid>
+        )}
+
+        {/* Supabase-backed CVs section */}
+        <Header style={{ marginTop: 40 }}>
+          <Title>🔒 Your Stored CVs (Supabase)</Title>
+          <Subtitle>Private files with signed download links</Subtitle>
+        </Header>
+        {userCvsLoading ? (
+          <LoadingSpinner>Loading your stored CVs...</LoadingSpinner>
+        ) : userCvs.length === 0 ? (
+          <EmptyState>
+            <EmptyIcon>🔐</EmptyIcon>
+            <EmptyTitle>No stored CVs</EmptyTitle>
+            <EmptyDescription>
+              Upload a CV on the projects page while signed in to save it securely.
+            </EmptyDescription>
+          </EmptyState>
+        ) : (
+          <CVGrid>
+            {userCvs.map((row) => (
+              <CVCard key={row.id} isActive={row.is_active}>
+                <CVCardHeader>
+                  <CVTitle>{row.title}</CVTitle>
+                  {row.is_active && <ActiveBadge>Active</ActiveBadge>}
+                </CVCardHeader>
+
+                <CVMeta>
+                  <MetaItem>
+                    <strong>Path:</strong> {row.filename}
+                  </MetaItem>
+                  <MetaItem>
+                    <strong>Created:</strong> {formatDate(row.created_at)}
+                  </MetaItem>
+                </CVMeta>
+
+                <CVActions>
+                  <CVActionButton
+                    className="secondary"
+                    onClick={async () => {
+                      const targetPath = row.url || row.filename;
+                      const { url, error } = await createSignedUrl(targetPath, 60 * 10);
+                      if (!error && url) {
+                        window.open(url, '_blank');
+                      }
+                    }}
+                  >
+                    View / Download
                   </CVActionButton>
                 </CVActions>
               </CVCard>
