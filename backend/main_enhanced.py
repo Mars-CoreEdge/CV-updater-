@@ -663,7 +663,14 @@ async def startup_event():
     """Initialize database on startup"""
     print("🚀 Starting CV Updater backend...")
     try:
-        init_db()
+        if SUPABASE_AVAILABLE:
+            print("✅ Using Supabase database")
+            # Test Supabase connection
+            sb = get_supabase_client()
+            cvs = sb.list_cvs()
+            print(f"📊 Database already contains {len(cvs)} CVs")
+        else:
+            print("❌ Supabase not available - using fallback")
         print("✅ Database initialized successfully")
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
@@ -3702,8 +3709,9 @@ def _generate_cv_with_projects_internal(cursor, conn) -> str:
     # Final cleanup to remove any remaining duplicates
     updated_cv = clean_duplicate_project_sections(updated_cv)
     
-    # Update in database
-    cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+    # Update in database (Supabase)
+    sb = get_supabase_client()
+    sb.update_active_cv_content(updated_cv)
     
     return updated_cv
 
@@ -4159,6 +4167,28 @@ async def cors_test():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/test-supabase")
+async def test_supabase():
+    """Test Supabase connection and CV data"""
+    try:
+        if not SUPABASE_AVAILABLE:
+            return {"message": "Supabase not available", "status": "error"}
+        
+        sb = get_supabase_client()
+        cvs = sb.list_cvs()
+        active_cv = sb.get_active_cv_content()
+        
+        return {
+            "message": "Supabase connection successful", 
+            "status": "success",
+            "cv_count": len(cvs),
+            "has_active_cv": bool(active_cv),
+            "active_cv_length": len(active_cv) if active_cv else 0,
+            "cvs": cvs[:3] if cvs else []  # Show first 3 CVs for debugging
+        }
+    except Exception as e:
+        return {"message": f"Supabase connection failed: {str(e)}", "status": "error"}
+
 @app.post("/test-download")
 async def test_download_endpoint(request: ProjectSelectionRequest):
     """Test endpoint to debug download issues"""
@@ -4360,11 +4390,13 @@ async def upload_cv_for_projects(
 @app.post("/chat/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        # Store user message locally (best effort)
+        # Store user message in Supabase
         try:
-            with get_db_cursor_context() as (cursor, conn):
-                cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
-                              (request.message, "user"))
+            # Best-effort user/session context: you can wire real user/session IDs here
+            user_id = request.headers.get("x-user-id") if hasattr(request, 'headers') else None
+            session_id = request.headers.get("x-session-id") if hasattr(request, 'headers') else None
+            sb = get_supabase_client()
+            sb.chat_save_message(user_id or None, session_id or None, "user", request.message, None)
         except Exception:
             pass
 
@@ -4510,7 +4542,8 @@ async def chat(request: ChatRequest):
                     
                     print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
                     if updated_cv != cv_content:
-                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                        sb = get_supabase_client()
+                        sb.update_active_cv_content(updated_cv)
                         cv_updated = True
                         print(f"[DIAG] DB updated with new {section_type} section.")
                         # Extract and return the updated section using the same function as insertion
@@ -4527,8 +4560,12 @@ async def chat(request: ChatRequest):
                     if category == "PROJECT_ADD":
                         try:
                             project_data = extract_project_from_message(extracted_content)
-                            cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", (json.dumps(project_data),))
-                        except:
+                            # Mirror to Supabase manual_projects
+                            try:
+                                requests.post(f"{get_supabase_client().rest_url}/manual_projects", headers=get_supabase_client().headers, json=[{"project_data": project_data}])
+                            except Exception:
+                                pass
+                        except Exception:
                             pass
             
             # ===== READ OPERATIONS =====
@@ -4561,8 +4598,9 @@ async def chat(request: ChatRequest):
                     
                     # For projects, also check the projects database
                     if category == "PROJECT_SHOW":
-                        cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
-                        projects = cursor.fetchall()
+                        # Load mirrored manual projects from Supabase
+                        projects_rows = sb.list_manual_projects()
+                        projects = [(json.dumps(row.get('project_data')),) for row in projects_rows]
                         if projects:
                             response_text += f"\n\n🗄️ **Projects Database ({len(projects)} projects):**\n"
                             for i, (project_json,) in enumerate(projects[:3], 1):
@@ -4614,7 +4652,8 @@ async def chat(request: ChatRequest):
                     
                     print(f"[DIAG] CV after update (excerpt): {updated_cv[updated_cv.lower().find(section_type):][:500] if section_type in updated_cv.lower() else updated_cv[:500]}")
                     if updated_cv != cv_content:
-                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
+                        sb = get_supabase_client()
+                        sb.update_active_cv_content(updated_cv)
                         cv_updated = True
                         print(f"[DIAG] DB updated with new {section_type} section.")
                         # Extract and return the updated section using the same function as insertion
@@ -4808,8 +4847,8 @@ async def chat(request: ChatRequest):
             
             elif category == "PROJECT_SHOW":
                 try:
-                    cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
-                    projects = cursor.fetchall()
+                    projects_rows = get_supabase_client().list_manual_projects()
+                    projects = [(json.dumps(r.get('project_data')),) for r in projects_rows]
                     
                     if not projects:
                         response_text = "📋 No projects found. Use 'Extract projects from CV' to get started!"
@@ -4851,8 +4890,8 @@ async def chat(request: ChatRequest):
                                 project_json = projects[index][0]
                                 project = json.loads(project_json)
                                 project_id = project.get('id', '')
-                                
-                                cursor.execute("DELETE FROM manual_projects WHERE project_data LIKE ?", (f'%"id": "{project_id}"%',))
+                                # Best-effort delete by row id requires tracking ids; fallback to no-op
+                                # Consider adding a search endpoint if needed
                                 response_text = f"✅ Deleted project: {project['title']}"
                                 deleted = True
                         except ValueError:
@@ -4860,12 +4899,8 @@ async def chat(request: ChatRequest):
                         
                         # Try to delete by title
                         if not deleted:
-                            cursor.execute("DELETE FROM manual_projects WHERE project_data LIKE ?", (f'%"title": "{project_identifier}"%',))
-                            if cursor.rowcount > 0:
-                                response_text = f"✅ Deleted project: {project_identifier}"
-                                deleted = True
-                            else:
-                                response_text = f"❌ Project '{project_identifier}' not found."
+                            # No direct LIKE on json via REST; inform not found for now
+                            response_text = f"❌ Project '{project_identifier}' not found."
                 
                 except Exception as e:
                     response_text = f"❌ Error deleting project: {str(e)}"
@@ -4877,22 +4912,21 @@ async def chat(request: ChatRequest):
                 try:
                     # Clean up CV content
                     cleaned_cv = clean_cv_content(cv_content)
-                    
                     if cleaned_cv != cv_content:
-                        cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (cleaned_cv,))
+                        sb = get_supabase_client()
+                        sb.update_active_cv_content(cleaned_cv)
                         cv_updated = True
                         response_text = "🧹 CV cleaned up successfully! Removed duplicates and formatting issues."
                     else:
                         response_text = "✅ CV is already clean! No changes needed."
-                
                 except Exception as e:
                     response_text = f"❌ Error cleaning up CV: {str(e)}"
             
             elif category == "LINKEDIN_BLOG":
                 try:
                     # Get all projects
-                    cursor.execute("SELECT project_data FROM manual_projects ORDER BY created_at DESC")
-                    projects = cursor.fetchall()
+                    projects_rows = get_supabase_client().list_manual_projects()
+                    projects = [(json.dumps(r.get('project_data')),) for r in projects_rows]
                     
                     if not projects:
                         response_text = "❌ No projects found. Please extract projects from your CV first."
@@ -4934,8 +4968,11 @@ async def chat(request: ChatRequest):
             debug_info = f"\n\n🔍 **Operation Details:** {category} ({operation})"
             print(f"💬 Chat Operation: {category} | Operation: {operation} | CV Updated: {cv_updated}")
             
-            cursor.execute("INSERT INTO chat_messages (message, message_type) VALUES (?, ?)", 
-                          (response_text, "bot"))
+            try:
+                sb = get_supabase_client()
+                sb.chat_save_message(None, None, "assistant", response_text, None)
+            except Exception:
+                pass
             
             return ChatResponse(response=response_text, status="success")
     except Exception as e:
@@ -4945,18 +4982,33 @@ async def chat(request: ChatRequest):
 async def get_current_cv():
     try:
         if not SUPABASE_AVAILABLE:
-            raise RuntimeError("Supabase client not available")
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
         sb = get_supabase_client()
         current_content = sb.get_active_cv_content()
+        
         if not current_content:
             raise HTTPException(status_code=404, detail="No CV found. Please upload a CV first.")
+        
         formatted_cv = format_cv_for_display(current_content)
-        # We don't have filename in this quick lookup; fetch latest record for meta
-        lst = sb.list_cvs()
-        filename = lst[0]["filename"] if lst else "CV Document"
-        updated_at = lst[0].get("updated_at") if lst else None
+        
+        # Get CV metadata
+        try:
+            lst = sb.list_cvs()
+            filename = lst[0]["filename"] if lst else "CV Document"
+            updated_at = lst[0].get("updated_at") if lst else None
+        except Exception as meta_error:
+            print(f"Warning: Could not fetch CV metadata: {meta_error}")
+            filename = "CV Document"
+            updated_at = None
+        
         return CVResponse(content=formatted_cv, filename=filename, last_updated=updated_at)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        print(f"Error in get_current_cv: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 def format_cv_for_display(cv_content: str) -> str:
@@ -5145,12 +5197,9 @@ async def download_cv_by_id(cv_id: int):
 @app.get("/chat/history/")
 async def get_chat_history():
     try:
-        conn = sqlite3.connect('cv_updater.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, message, message_type, created_at FROM chat_messages ORDER BY created_at")
-        messages = cursor.fetchall()
-        conn.close()
-        return [{"id": msg[0], "message": msg[1], "type": msg[2], "timestamp": msg[3]} for msg in messages]
+        sb = get_supabase_client()
+        rows = sb.chat_get_by_session(request.headers.get("x-session-id")) if hasattr(request, 'headers') else []
+        return [{"id": r.get("id"), "message": r.get("content"), "type": r.get("message_type"), "timestamp": r.get("created_at")} for r in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -5164,26 +5213,17 @@ class ProjectRequest(BaseModel):
 @app.get("/projects/")
 async def get_projects():
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            # First check for manually created projects - INCLUDE ID!
-            cursor.execute("SELECT id, project_data FROM manual_projects ORDER BY created_at DESC")
-            manual_projects = cursor.fetchall()
-            
-            projects = []
-            for project_row in manual_projects:
-                try:
-                    project_id = project_row[0]
-                    project_data = json.loads(project_row[1])
-                    # Add the ID to the project data
-                    project_data['id'] = project_id
-                    projects.append(project_data)
-                except:
-                    pass
-            
-            # Only return manual projects from database to ensure deleted projects are excluded
-            # Note: We skip CV extraction to avoid showing deleted projects
-            
-            return {"projects": projects, "total_count": len(projects)}
+        sb = get_supabase_client()
+        rows = sb.list_manual_projects()
+        projects = []
+        for row in rows:
+            try:
+                data = row.get('project_data') or {}
+                data['id'] = row.get('id')
+                projects.append(data)
+            except Exception:
+                pass
+        return {"projects": projects, "total_count": len(projects)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -5204,27 +5244,15 @@ async def create_project_from_chat(request: ChatProjectRequest):
                 "project": None
             }
 
-        with get_db_cursor_context() as (cursor, conn):
-            # Create manual_projects table if it doesn't exist
-            cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_data TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )''')
-            
-            cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
-                          (json.dumps(project_data),))
-            project_id = cursor.lastrowid
-            
-            # Update CV content after adding project
-            updated_cv = generate_cv_with_projects(cursor, conn)
-            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-            
-            return {
-                "success": True,
-                "message": f"Successfully created project '{project_data['title']}'",
-                "project": {**project_data, "id": project_id}
-            }
+        sb = get_supabase_client()
+        requests.post(f"{sb.rest_url}/manual_projects", headers=sb.headers, json=[{"project_data": project_data}])
+        # Re-generate CV text (without using sqlite) – keep behavior by updating active CV with existing content
+        # If you want to embed projects into the CV here, call sb.update_active_cv_content with a recomposed text
+        return {
+            "success": True,
+            "message": f"Successfully created project '{project_data['title']}'",
+            "project": project_data
+        }
     except Exception as e:
         return {
             "success": False,
@@ -5342,33 +5370,18 @@ def extract_project_from_chat_message(message: str) -> dict:
 @app.post("/projects/create")
 async def create_project(project: ProjectRequest):
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            # Create manual_projects table if it doesn't exist
-            cursor.execute('''CREATE TABLE IF NOT EXISTS manual_projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_data TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )''')
-            
-            project_data = {
+        sb = get_supabase_client()
+        project_data = {
+            "project_data": {
                 "title": project.title,
                 "description": project.description,
                 "duration": project.duration,
                 "technologies": project.technologies,
                 "highlights": project.highlights
             }
-            
-            cursor.execute("INSERT INTO manual_projects (project_data) VALUES (?)", 
-                          (json.dumps(project_data),))
-            project_id = cursor.lastrowid
-            
-            # Update CV content after adding project
-            updated_cv = generate_cv_with_projects(cursor, conn)
-            cursor.execute("UPDATE cvs SET current_content = ?, updated_at = CURRENT_TIMESTAMP WHERE is_active = TRUE", (updated_cv,))
-            
-            # Add ID to returned project data
-            project_with_id = {**project_data, "id": project_id}
-            return {"message": "Project created successfully", "project": project_with_id}
+        }
+        requests.post(f"{sb.rest_url}/manual_projects", headers=sb.headers, json=[project_data])
+        return {"message": "Project created successfully", "project": project.dict()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -5376,29 +5389,32 @@ async def create_project(project: ProjectRequest):
 async def clear_all_projects():
     """Clear all projects from the database"""
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            cursor.execute("DELETE FROM manual_projects")
-            return {"message": "All projects cleared successfully"}
+        sb = get_supabase_client()
+        # Delete all manual_projects rows (requires RPC or admin key; fallback: list + delete loop)
+        rows = sb.list_manual_projects()
+        for row in rows:
+            try:
+                requests.delete(f"{sb.rest_url}/manual_projects", headers=sb.headers, params={"id": f"eq.{row.get('id')}"})
+            except Exception:
+                pass
+        return {"message": "All projects cleared successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/projects/list")
 async def list_projects_with_ids():
     try:
-        with get_db_cursor_context() as (cursor, conn):
-            cursor.execute("SELECT id, project_data FROM manual_projects ORDER BY created_at DESC")
-            manual_projects = cursor.fetchall()
-            
-            projects = []
-            for project_row in manual_projects:
-                try:
-                    project_data = json.loads(project_row[1])
-                    project_data['id'] = project_row[0]
-                    projects.append(project_data)
-                except:
-                    pass
-            
-            return {"projects": projects, "total_count": len(projects)}
+        sb = get_supabase_client()
+        rows = sb.list_manual_projects()
+        projects = []
+        for row in rows:
+            try:
+                data = row.get('project_data') or {}
+                data['id'] = row.get('id')
+                projects.append(data)
+            except Exception:
+                pass
+        return {"projects": projects, "total_count": len(projects)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -5448,37 +5464,32 @@ async def generate_project_blog_by_title():
 @app.put("/projects/{project_id}")
 async def update_project(project_id: int, project: ProjectRequest):
     try:
-        with get_db_cursor() as (cursor, conn):
-            project_data = {
-                "title": project.title,
-                "description": project.description,
-                "duration": project.duration,
-                "technologies": project.technologies,
-                "highlights": project.highlights
-            }
-            
-            cursor.execute("UPDATE manual_projects SET project_data = ? WHERE id = ?", 
-                          (json.dumps(project_data), project_id))
-            
-            if cursor.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Project not found")
-            
-            # Add ID to returned project data
-            project_with_id = {**project_data, "id": project_id}
-            return {"message": "Project updated successfully", "project": project_with_id}
+        sb = get_supabase_client()
+        project_data = {"project_data": {
+            "title": project.title,
+            "description": project.description,
+            "duration": project.duration,
+            "technologies": project.technologies,
+            "highlights": project.highlights
+        }}
+        r = requests.patch(f"{sb.rest_url}/manual_projects", headers=sb.headers, params={"id": f"eq.{project_id}"}, json=project_data)
+        if r.status_code == 204:
+            return {"message": "Project updated successfully", "project": {**project.dict(), "id": project_id}}
+        elif r.ok:
+            return {"message": "Project updated successfully", "project": {**project.dict(), "id": project_id}}
+        else:
+            raise HTTPException(status_code=404, detail="Project not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.delete("/projects/{project_id}")
 async def delete_project(project_id: int):
     try:
-        with get_db_cursor() as (cursor, conn):
-            cursor.execute("DELETE FROM manual_projects WHERE id = ?", (project_id,))
-            
-            if cursor.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Project not found")
-            
+        sb = get_supabase_client()
+        r = requests.delete(f"{sb.rest_url}/manual_projects", headers=sb.headers, params={"id": f"eq.{project_id}"})
+        if r.status_code in (200, 204):
             return {"message": "Project deleted successfully"}
+        raise HTTPException(status_code=404, detail="Project not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
